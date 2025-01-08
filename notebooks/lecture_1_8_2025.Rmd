@@ -1,0 +1,330 @@
+---
+title: "Lecture 1/8/2025"
+output:
+  word_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# Elementary R
+
+Examples of creating scalar variables and combining them:
+
+```{r}
+x=5
+y=3
+z = x+y
+print(z)
+```
+
+```{r}
+z
+```
+
+Strings are also possible:
+
+```{r}
+data_name = "day one example"
+print(data_name)
+```
+
+`=` is equivalent to `<-` in R
+
+```{r}
+x<- 5
+print(x)
+```
+
+```{r}
+6->y
+print(y)
+```
+
+# Arrays
+
+Arrays are constructed using `c` for *combine*:
+
+```{r}
+data = c(1,2,3)
+print(data)
+```
+
+```{r}
+data_names = c("age", "height", "weight")
+print(data_names)
+```
+
+Access elements with brackets with indexing beginning at 1 (not 0):
+
+```{r}
+data[1]
+```
+
+```{r}
+data_names[2]
+```
+
+Whole array (or vectorized) operations are possible with numeric data:
+
+```{r}
+x=c(1., 2., 3.)
+y=c(4., -2.4, 3.8)
+```
+
+```{r}
+x+y
+```
+
+```{r}
+x*y
+```
+
+Arrays of uniformly spaced elements:
+
+```{r}
+seq(0,1)
+```
+
+```{r}
+seq(0,1,length=11)
+```
+
+eleven uniformly spaced points from 0 to 1, inclusive
+
+```{r}
+x = seq(0,1,length=11)
+```
+
+```{r}
+y = sin(x)
+y
+```
+
+R has, built in, classical functions like `exp`, `cos`, `log`, etc.
+
+```{r}
+print(log(10))
+print(log10(10))
+```
+
+Exponentiation
+
+```{r}
+2^2
+```
+
+# Generating Random Variables in R
+
+## Uniform Random Variables
+
+These will be U(0,1) random variables (or more elegantly $U(0,1)$)
+
+```{r}
+runif(1)
+```
+
+This generates a single $U(0,1)$ random variable.
+
+```{r}
+runif(10)
+```
+
+```{r}
+runif(50)
+```
+
+The index, `[k]` indicate the immediate next value is the k-th element in the array.
+
+These examples are $U(0,1)$ examples. For $U(a,b)$, set the `min` and `max` values as desired:
+
+```{r}
+runif(1,min=-1, max=2) # U(-1,2) variable
+```
+
+```{r}
+runif(5,min=-1, max=2) 
+```
+
+## Reproducibility and Seeds
+
+```{r}
+runif(1)
+```
+
+```{r}
+runif(1)
+```
+
+Note that these are *pseudo*-random number generators. There is a deterministic algorithm lurking inside.
+
+Reproducibility is achieved by setting the *seed*:
+
+```{r}
+set.seed(100)
+```
+
+```{r}
+runif(5)
+```
+
+Reset the seed to the same value and call again:
+
+```{r}
+set.seed(100)
+```
+
+```{r}
+runif(1)
+```
+
+```{r}
+runif(2)
+```
+
+Changing the seed gives a difference sequence:
+
+```{r}
+set.seed(200)
+```
+
+```{r}
+runif(1)
+```
+
+Set the seed at the beginning of any code using random number generation for reproducibility. Also essential for debugging and software development.
+
+## Normal Random Variables
+
+For $N(0,1)$:
+
+```{r}
+rnorm(1)
+```
+
+```{r}
+rnorm(10)
+```
+
+In R, normal $N(m,\sigma^2)$ is parametrized by $m$ and $\sigma$, the standard dev:
+
+```{r}
+rnorm(5, 1, 0.1)
+```
+
+The above corresponds to $\sigma = 0.1$ not $\sigma^2 = 0.1$
+
+# Markdown
+
+Greek letters rendered in LaTeX:
+
+$\sigma$, $\alpha$, $\beta$, $\gamma$ $\delta$, $\Sigma$, $\Xi$ , $\Psi$ $\psi$
+
+and
+
+$\sum$ and $\int$
+
+For bits of code, use single quotes: `min` ,`f` , `mean`
+
+Formatting and headings
+
+*italics*
+
+**bold**
+
+## heading 2
+
+Lists are formatted with `*`
+
+-   First element
+
+-   Second element
+
+-   Third element
+
+    -   tab in to create a sublist
+
+Numbered lists are formatted with `1.`:
+
+1.  First entry
+2.  Second entry
+
+# Elementary Statistics in R
+
+Generate a basic numeric data set:
+
+```{r}
+set.seed(123)
+xdata = rnorm(100)
+print(xdata)
+```
+
+Basic summary statistics of data:
+
+```{r}
+summary(xdata)
+```
+
+More specific quantities:
+
+```{r}
+print(mean(xdata))
+```
+
+```{r}
+print(median(xdata))
+```
+
+For variance:
+
+```{r}
+print(var(xdata))
+```
+
+For standard deviation:
+
+```{r}
+print(sd(xdata))
+```
+
+```{r}
+print(quantile(xdata))
+```
+
+By default, `quantile` gives the 4 quartiles. Suppose we want the quintiles, instead, values at 0%, 20%, 40%, 60%, 80%, 100%:
+
+1.  Create an array of values, `pvals` that contains the values at which we want the quantile function
+2.  Evaluate `quantile(xdata, probs=pvals)`
+
+```{r}
+pvals = c(0, .2, .4, .6, .8, 1)
+```
+
+```{r}
+quantile(xdata, probs = pvals)
+```
+
+```{r}
+pvals2=c(0.2, .87, .99)
+quantile(xdata, probs = pvals2)
+```
+
+# Control Structures in R
+
+For loops, if-then-else's,
+
+```{r}
+for (j in 1:5){
+  print(j)
+}
+```
+
+```{r}
+x = 5
+if (x>3){
+  print(x)
+}else{
+  print("nope")
+}
+```
