@@ -1,0 +1,445 @@
+---
+title: "Lecture 1/10/2025"
+output:
+  word_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# Intro to Data Frames (tibbles)
+
+These are built in, but we're going to use `tibble`, part of the `tidyverse` . If you do not have this installed, you can use `install.packages("tidyverse")` in the console
+
+```{r}
+library(tidyverse) # loads the entire package fore use, a la import from python
+```
+
+Create a data frame:
+
+```{r}
+cast=tibble("Names"=c("Jerry", "George", "Elaine", "Cosmo"), "Ages"=c(38, 38, 37, 999))
+```
+
+```{r}
+cast
+```
+
+`<dbl>` is for double, as in double precision, the default data type for a real number in almost all modern languages.
+
+`999` is a "garbage" value that really reflects that the measurement was unavailable. Try to clean out garbage values. Use `NA` (not available) value. Plays an analogous role to `Inf` or `NaN`
+
+```{r}
+cast$Names # access columns
+```
+
+```{r}
+cast$Ages # access columns
+```
+
+Fix the entry that we believe is wrong:
+
+```{r}
+cast$Ages[4]=NA
+```
+
+```{r}
+cast
+```
+
+Age should really be in an integer. Let's make sure knows that:
+
+```{r}
+cast$Ages = as.integer(cast$Ages) # this maps the doubles into integers and changes the data type
+```
+
+```{r}
+cast
+```
+
+Data type is as desired.
+
+```{r}
+summary(cast)
+```
+
+This is an elementary data cleaning example.
+
+# Read an Excel Sheet into R
+
+The typcial work flow is read in a data set and load it into a `tibble`.
+
+This builds on a `tidyverse` function
+
+```{r}
+library(readxl) # this provides Excel reading functions
+```
+
+```{r}
+grades = read_excel("~/code/Math_318_2025/data/Grades.xlsx")
+```
+
+```{r}
+grades
+```
+
+`<dbl>` refers to double precision floating point numbers (i.e., the reals).
+
+```{r}
+summary(grades)
+```
+
+We will return to how to get R to interpret different columns as different data types (i.e., categorical).
+
+```{r}
+grades[1,] # first row
+```
+
+```{r}
+grades[15,] # 15th row
+```
+
+```{r}
+grades[2] # with no comma, second column
+```
+
+## Setting Data Types in Data Frames
+
+```{r}
+grades
+```
+
+Note that both columns are stored as `<dbl>` , this is the double precision data type from C/C++/Java/Python/MATLAB/etc.
+
+```{r}
+summary(grades)
+```
+
+**NOTE** the statistics on the Student (ID), are meaningless.
+
+We will let R know that it is a categorical variable:
+
+```{r}
+grades$Student = factor(grades$Student)
+```
+
+The above converts the data type of the column to `<fctr>` type, which is for categorical variables.
+
+```{r}
+grades
+```
+
+We can also set the Grade type to be an integer:
+
+```{r}
+grades$Grade=as.integer(grades$Grade)
+```
+
+```{r}
+grades
+```
+
+Now summarize:
+
+```{r}
+summary(grades)
+```
+
+## Repeat this with CSV type data
+
+CSV is more common/general than Excel.
+
+```{r}
+grades.csv = read.csv("../data/Grades.csv")
+```
+
+```{r}
+grades.csv
+```
+
+This has been read in as a `df`, the default R, data frame (**NOT** yet a tibble). Usually worth converting to a tibble:
+
+```{r}
+grades.csv=as_tibble(grades.csv) # converts format
+```
+
+```{r}
+grades.csv
+```
+
+Fix the data type of Student:
+
+```{r}
+grades.csv$Student=as_factor(grades$Student)
+```
+
+`as.factor` and `as_factor` are the same thing. True of many commands in R, `as.integer` and `as_integer` .
+
+## Exporting data
+
+```{r}
+x=seq(0,1,length=11) # create some data
+```
+
+```{r}
+x
+```
+
+```{r}
+write.csv(x,file="../data/sample.csv") # writes x, and saves it to indicated file
+```
+
+Export summary data.
+
+```{r}
+grades.summary = summary(grades)
+```
+
+```{r}
+grades.summary
+```
+
+```{r}
+write.csv(grades.summary,file="~/code/Math_318_2025/data/grades.summary.txt") # writes only the summary information
+```
+
+How to export to LaTeX as a table
+
+```{r}
+library(xtable)
+```
+
+**NOTE** `xtable` expects a data frame type as its input argument. This can be a tibble or a default data frame. We must first map it to a data frame with `as.data.frame`
+
+```{r}
+xtable(as.data.frame(x))
+```
+
+Get into a text file:
+
+```{r}
+print.xtable(xtable(as.data.frame(x)), file="~/code/Math_318_2025/data/tex_table.txt")
+```
+
+# Basic Plotting and Visualization
+
+## Built in functions
+
+Make some basic data
+
+```{r}
+x=seq(0,1,length=51)
+y = x*(1-x) # this is a parabola, x vs. y
+```
+
+Plot the parabola
+
+```{r}
+plot(x,y)
+```
+
+**NOTE** The default plotting is too bland for anything but a quick visualization.
+
+Add some color and annotations:
+
+```{r}
+plot(x,y, main="Example Plot", xlab="x", ylab="x(1-x)", type="l", col="blue", lwd=2)
+```
+
+The additional arguments:
+
+-   `main` - plot title
+
+-   `xlab` - x axis label
+
+-   `ylab` - y axis label
+
+-   `type` - line with `l`, instead. of a scatter plot (default)
+
+-   `col` - color
+
+-   `lwd` - linewidth in pts.
+
+What are our color options?
+
+```{r}
+colors()
+```
+
+```{r}
+plot(x,y, main="Example Plot", xlab="x", ylab="x(1-x)", type="l", col="mediumorchid1", lwd=2)
+```
+
+Suppose we want to just export the figure:
+
+```{r}
+pdf(file="plot1.pdf", height=4, width=6) # note, need to specify height/width (in inches)
+plot(x,y, main="Example Plot", xlab="x", ylab="x(1-x)", type="l", col="mediumorchid1", lwd=2)
+dev.off() # stop writing to the file with this command
+```
+
+If the pdf format is ever too big, use `png` instead.
+
+## Boxplots
+
+```{r}
+set.seed(100)
+x=rnorm(100, mean=10, sd=2) # generate some data
+```
+
+```{r}
+boxplot(x)
+```
+
+-   Solid line is the median
+
+-   The box is the interquartile range, middle 50% of the data
+
+-   Stems are the max/mins
+
+-   If they show up, scatter points are "outliers"
+
+Make this more interesting:
+
+```{r}
+boxplot(x, main="Sample Box Plot", horizontal = TRUE, 
+        col="red", xlab="x", ylab="Samples 1", cex.lab=1.5, cex.axis=1.25, cex.main=2)
+```
+
+-   `horizontal` changes the orientation
+
+-   `cex.lab` , `cex.axis` and `cex.main` - control the font sizes as percentages of the default.
+
+## Histogram
+
+```{r}
+x=rnorm(10^4, mean=2, sd=2)
+```
+
+```{r}
+hist(x)
+```
+
+Bell shaped Gaussian curve, as expected.
+
+Annotate and improve:
+
+```{r}
+hist(x, breaks=50, main="N(2,2^2) Data", xlab="x", col="snow2", prob=TRUE)
+```
+
+By setting `prob=TRUE` , we are estimating the density, as in the probability density, from the data. Compare against analytic solution:
+
+```{r}
+hist(x, breaks=50, main="N(2,2^2) Data", xlab="x", col="snow2", prob=TRUE)
+curve(dnorm(x, mean=2, sd=2), add=TRUE, col="navy", lwd=2)
+```
+
+`curve` plots a curve, `dnorm` specifies the function is the density of the normal, withe specified `mean` and `sd` , `add=TRUE` adds it to the existing plot.
+
+Empirical histogram, when normalized, sits on the density curve.
+
+# Better Graphics with ggplot2
+
+As noted, the default graphics package in R is ok, but not great. Substantially better, out of the box, graphics can be generated with the `ggplot2` , which is part of the `tidyverse` :
+
+```{r}
+library(tidyverse)
+```
+
+The way of thinking of `ggplot2` graphics is in terms of addition, in that you will add graphical elements together, with the `+` , incrementally improving your plot. Roughly, you should think about it in terms of
+
+Figure = Data Set + Graphical Manipulations of the data + Annotations
+
+While it is not essential to create a data set, as a data frame (tibble or otherwise), to use `ggplot2` , there are advantages to using data frames here too.
+
+## Parabola Plot
+
+First, we will plot the parabola, $x(1-x)$ , manually:
+
+```{r}
+x = seq(0,1,length=51)
+y = x*(1-x)
+xy.plt = ggplot(mapping = aes(x,y))
+```
+
+This has created a plot, `xy.plt` which has, as its data, the *aesthetic*, `aes` . At this point, we see nothing. We can get the figure on the screen with the `print` command:
+
+```{r}
+print(xy.plt)
+```
+
+We now have a figure, but nothing in it. This is because we have not told it how to, geometrically, interpret the data.
+
+### Scatter Plot
+
+We have several options:
+
+`geom_point()` for a scatter plot.
+
+```{r}
+xy.plt.point = xy.plt + geom_point() # interpret the data with a scatter plot
+print(xy.plt.point)
+```
+
+### Line Plot
+
+```{r}
+xy.plt.line = xy.plt + geom_line() # interpret the data with a line plot
+print(xy.plt.line)
+```
+
+### Both
+
+```{r}
+xy.plt.scatter_line = xy.plt +geom_point()+ geom_line() # interpret the data with a line plot
+print(xy.plt.scatter_line)
+```
+
+### Titles
+
+We can add a title to the plot with `ggtitle` :
+
+```{r}
+xy.plt.title = xy.plt + geom_line() + ggtitle("Parabola Plot") 
+# interpret the data with a line plot
+print(xy.plt.title)
+```
+
+### Saving to Disk
+
+Figures can be saved to disk with the `ggsave` command:
+
+```{r}
+ggsave("ggplt1.pdf", plot = xy.plt.title, width = 6, height = 4) # size in inches
+```
+
+### Working with Data Frames
+
+As noted, `ggplot2` plays nicely with data frames. First, we will stick our data into a data frame and then build on that:
+
+```{r}
+xy.df=tibble(Position=x,Velocity=y) # These are sample variable names
+xy.df
+```
+
+```{r}
+df.plt = ggplot(xy.df) + # load data
+  geom_line(mapping=aes(x=Position,y=Velocity), color="darkorange1",lwd=2) + # specify geometry
+  ggtitle("Plotting with a data frame")
+print(df.plt)
+```
+
+Notice that it automatically picks up the variable names from the data frame for the axes
+
+## Grades Data Set example
+
+```{r}
+hist_plt = ggplot(data=grades)
+hist_plt = hist_plt + geom_histogram(mapping = aes(x=Grade),bins = 10)
+hist_plt = hist_plt + ggtitle("Grade Distribution")
+print(hist_plt)
+```
+
+## 
