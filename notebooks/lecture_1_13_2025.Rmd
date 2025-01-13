@@ -4,12 +4,14 @@ output: html_document
 date: "2025-01-12"
 ---
 
+Need to look at what this does.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-library(tidyverse)
+library(tidyverse) # gets ggplot2 and tibble
 ```
 
 # Better Graphics with ggplot2
@@ -46,8 +48,10 @@ print(mpg.plt1)
 
 ```{r}
 mpg.plt2 = mpg.plt + geom_boxplot(mapping = aes(x=cylinders, y= mpg))
-print(mpg.plt1)
+print(mpg.plt2)
 ```
+
+**Question** Why do 3 cylinder engines break the trend?
 
 **NOTE** that we changed the horizontal grouping by changing the `x` argument to the `aes`. We can further slice our data, visualizing the breakdowns together:
 
@@ -56,6 +60,10 @@ mpg.plt3 = mpg.plt + geom_boxplot(mapping = aes(x=cylinders, y= mpg, fill=origin
 print(mpg.plt3)
 
 ```
+
+The `fill` argument further atomizes the `x` categories.
+
+Within the 4 cylinder case, all regions are fairly similar in performance. it is the 8 cylinder engines from region 1 (North America) that weight down the average North American mpg performance.
 
 ```{r}
 mpg.plt4 = mpg.plt + geom_boxplot(mapping = aes(x=origin, y= mpg, fill=cylinders))
@@ -77,25 +85,32 @@ print(hist.mpg.plt1)
 **NOTE:** I manually set `bins=10` , as in 10 histogram bins, because a warning was generated with the default value
 
 ```{r}
-hist.mpg.plt2 = mpg.plt + geom_histogram(aes(x=mpg,fill=origin)) + ggtitle("MPG Distribution by Origin")
+hist.mpg.plt2 = mpg.plt + geom_histogram(aes(x=mpg,fill=origin), bins=10) + 
+  ggtitle("MPG Distribution by Origin")
 print(hist.mpg.plt2)
 ```
+
+The `fill` command atomizes the data in visualization (again).
 
 Alternatively, we can set `color` :
 
 ```{r}
-hist.mpg.plt3 = mpg.plt + geom_histogram(aes(x=mpg,color=origin), bins=10) + ggtitle("MPG Distribution by Origin")
+hist.mpg.plt3 = mpg.plt + geom_histogram(aes(x=mpg,color=origin), bins=10) + 
+  ggtitle("MPG Distribution by Origin")
 print(hist.mpg.plt3)
 ```
 
 And we can improve the readability by making the bars transparent (changing `alpha` ):
 
 ```{r}
-hist.mpg.plt4 = mpg.plt + geom_histogram(aes(x=mpg,fill=origin), bins=10, alpha=0.7) + ggtitle("MPG Distribution by Origin")
+hist.mpg.plt4 = mpg.plt + geom_histogram(aes(x=mpg,fill=origin), bins=10, alpha=0.7) +
+  ggtitle("MPG Distribution by Origin")
 print(hist.mpg.plt4)
 ```
 
 # Basic QQ Plots
+
+Generate some data for comparison. Five data sets are generated in the following cell.
 
 ```{r}
 set.seed(100)
@@ -124,7 +139,7 @@ This is close to $y=x$, and it should be
 qqplot(u,x)
 ```
 
-Comparison of $N(0,1)$ with $U(0,1)$; this is really not a line now.
+Comparison of $N(0,1)$ with $U(0,1)$; this is really not a line now. Unambiguously nonlinear
 
 ```{r}
 qqplot(x,y)
@@ -137,272 +152,3 @@ qqnorm(x)
 ```
 
 `qqnorm` checks a single data set against $N(0,1)$
-
-## QQ Plots with ggplot2
-
-### Single Data Set
-
-```{r}
-qq.plt = ggplot(mapping=aes(sample=u)) + 
-  geom_qq() + geom_qq_line(color="red") + 
-  ggtitle("QQ Plot for a U(0,1) Data")
-print(qq.plt)
-```
-
-### Two Data Sets
-
-This is not built in to `ggplot2` and requires a bit of programming. First, we `sort` the data:
-
-```{r}
-su = sort(u) # sort array in x_i<x_{i+1} ordering
-sv = sort(v)
-sx = sort(x)
-
-```
-
-Next, we will need to interpolate (using `approx`), if the lengths of the arrays we wish to compare are not equal:
-
-```{r}
-if (length(su)< length(sv)){
-  su_interp <- su
-  # perform a linear interpolation to get a vector of the same length
-  sv_interp <- approx(1:length(sv),sv,n=length(su))$y
-}else{
-  sv_interp <- sv
-  su_interp <- approx(1:length(su),su,n=length(sv))$y
-}
-```
-
-For conciseness, pack into a `tibble`:
-
-```{r}
-uv.df <- tibble(u=su_interp, v=sv_interp)
-
-```
-
-Now plot:
-
-```{r}
-qq2.plt =ggplot(data=uv.df) + 
-  geom_point(aes(x=u, y=v)) + 
-  ggtitle("QQ Plot of Two Distinct Uniform Data Sets")
-print(qq2.plt)
-
-```
-
-Repeat with `u` against `x`:
-
-```{r}
-if (length(su)< length(sx)){
-  su_interp <- su
-  # perform a linear interpolation to get a vector of the same length
-  sx_interp <- approx(1:length(sx),sx,n=length(su))$y
-}else{
-  sx_interp <- sx
-  su_interp <- approx(1:length(su),su,n=length(sx))$y
-}
-ux.df <- tibble(u=su_interp, x=sx_interp)
-
-```
-
-Plot:
-
-```{r}
-qq2ux.plt =ggplot(data=ux.df) + 
-  geom_point(aes(x=u, y=x)) + 
-  ggtitle("QQ Plot of Normal and Uniform Data")
-print(qq2ux.plt)
-
-```
-
-# Additional Annotation Tools
-
-Manipulate the `Auto` data set
-
-```{r}
-Auto$origin=as_factor(Auto$origin)
-Auto$cylinders=as_factor(Auto$cylinders)
-```
-
-```{r}
-mpg.plt = ggplot(Auto) # we will reuse this 
-mpg.plt1 = mpg.plt + geom_boxplot(mapping = aes(x=origin, y= mpg))
-print(mpg.plt1)
-```
-
-```{r}
-summary(Auto$origin)
-```
-
-This could be in a caption or the text, but can we get into the figure directly?
-
-Add an annotation:
-
-```{r}
-mpg.plt2 = mpg.plt1 + annotate("text", x=c(1.1, 2.1, 3.1), y = c(30, 40, 45), 
-                               label=sprintf("n=%d", summary(Auto$origin)),
-                               color="red")
-print(mpg.plt2)
-```
-
-What did we do:
-
--   `text` - says the figure annotation will be a text object
-
--   `x` and `y` - these are selected by guess and check as to where to put the labels
-
--   `label=sprintf` - this is C/C++ style string formatting.
-
-Alternatively, turn the summary information into a data frame itself:
-
-```{r}
-summary.df= tally(group_by(Auto, origin))
-summary.df
-```
-
-`tally` sums up the data in each case from the `group_by`.
-
-```{r}
-auto.plt = ggplot(Auto)
-auto.plt = auto.plt+geom_boxplot(aes(x=origin, y = mpg))
-auto.plt = auto.plt+geom_label(data=summary.df, aes(x=origin, label=sprintf("n = %d",n)), 
-                       y =max(Auto$mpg), color="red")
-
-print(auto.plt)
-```
-
-# Correlations
-
-## Model Problem
-
-Create data
-
-$$
-y_i = x_i^3 + \epsilon_i
-$$
-
-Think of $\epsilon$ as "noise" in the measurements, and for simplicity, assume $\epsilon_i \sim N(0, \sigma^2)$ for some particular variance, $\sigma$ .
-
-```{r}
-set.seed(100) # set a seed for reproducibility
-x=seq(-5, 5, length=101) # 101 uniformly spaced points between -5 and 5
-xi =  rnorm(length(x)) # create a vector of Gaussians with same size as x, N(0,1)
-# look at different magnitude noises
-sigma2_vals = c(0, 10, 50,100, 500) 
-
-# store in a data structure, data frame, with the columns we want
-df = tibble(x = numeric(), y=numeric(), noise=factor())
-df
-```
-
-```{r}
-#populate the data frame
-for(j in 1:length(sigma2_vals)){
-  sigma2 = sigma2_vals[j] # get the jth coordinate
-  y = x^3 + (sigma2) * xi # add noise with variance sigma2 to x^3, each y is also of same size as x
-  df =add_row(df, x = x, y = y, noise = as.factor(sigma2))
-}
-df
-```
-
-```{r}
-summary(df)
-```
-
-Example of the `filter` command:
-
-This extracts all the cases with with noise = 10
-
-```{r}
-filter(df, noise == 10)
-```
-
-This extracts the cases with x\>2
-
-```{r}
-filter(df, x>2)
-```
-
-This extracts all the cases with x\>2 AND y\>10
-
-```{r}
-filter(df, (x>2)&(y>10)) # the & is an AND
-```
-
-```{r}
-sigma2_vals
-```
-
-```{r}
-length(sigma2_vals)
-```
-
-```{r}
-1:length(sigma2_vals)
-```
-
-```{r}
-correlations=c() # empty to start
-for(j in 1:length(sigma2_vals)){
-  sigma2 = sigma2_vals[j] # look at just the j-th noise case
-  x_filtered = filter(df, noise == sigma2)$x # extract x and y values for this case
-  y_filtered = filter(df, noise == sigma2)$y
-  cor_est = cor(x_filtered, y_filtered) # compute the correlation
-  correlations <- append(correlations, cor_est) # store in the array
-}
-correlations
-```
-
-Greater noise, less correlation. Graphically:
-
-```{r}
-cubic.plt=ggplot(df) + geom_point(aes(x,y, color=noise))
-cubic.plt = cubic.plt + scale_color_discrete(name="Noise Intensity")
-print(cubic.plt)
-```
-
-## Auto Data Set Problem
-
-`Auto` dataframe
-
-```{r}
-Auto
-```
-
-```{r}
-cor(Auto) # many of the features (columns) are not numerical values (real and integer values)
-```
-
-Filter the numerical features:
-
-```{r}
-select_if(Auto, is.numeric)
-```
-
-Get the pair correlations amongst all the numerical variables:
-
-```{r}
-cor(select_if(Auto, is.numeric))
-```
-
-**NOTE** The matrix is symmetric because
-
-$$
- \mathrm{Cor}(X,Y) =  \mathrm{Cor}(Y,X) 
-$$
-
-and
-
-$$
-\mathrm{Cor}(X,X) = 1,
-$$
-
-always.
-
-Looking ahead: we will build statistical models with the insight that more strongly correlated variables are more important to the model.
-
-Graphically visualize pair correlations:
-
-```{r}
-pairs(select_if(Auto, is.numeric))
-```
