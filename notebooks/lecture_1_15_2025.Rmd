@@ -1,0 +1,201 @@
+---
+title: "Lecture 1/15/2025"
+output: html_document
+date: "2025-01-13"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Basic QQ Plots
+
+```{r}
+set.seed(100)
+u = runif(10^3) # U(0,1)
+v = runif(2000, min=10, max=25) # U(10,25)
+w = runif(100) # U(0,1)
+x = rnorm(10^4) # N(0,1)
+y = rnorm(5000, mean=10, sd =2) #N(10,2^2)
+```
+
+## QQ Plots with ggplot2
+
+### Single Data Set
+
+Recall, this compares against $N(0,1)$
+
+```{r}
+qq.plt = ggplot(mapping=aes(sample=u)) + 
+  geom_qq() + geom_qq_line(color="red") + 
+  ggtitle("QQ Plot for a U(0,1) Data")
+print(qq.plt)
+```
+
+```{r}
+qq.plt = ggplot(mapping=aes(sample=y)) + 
+  geom_qq() + geom_qq_line(color="red") + 
+  ggtitle("QQ Plot for Gaussian Data")
+print(qq.plt)
+```
+
+This sits on the $y=2x+10$ line, since the data is from $N(10,2^2)$
+
+### Two Data Sets
+
+This is not built in to `ggplot2` and requires a bit of programming.
+First, we `sort` the data:
+
+```{r}
+su = sort(u) # sort array in x_i<x_{i+1} ordering
+sv = sort(v)
+sx = sort(x)
+```
+
+Next, we will need to interpolate (using `approx`), if the lengths of
+the arrays we wish to compare are not equal:
+
+```{r}
+if (length(su)< length(sv)){
+  su_interp=su
+  # perform a linear interpolation to get a vector of the same length
+  sv_interp=approx(1:length(sv),sv,n=length(su))$y
+}else{
+  sv_interp=sv
+  su_interp=approx(1:length(su),su,n=length(sv))$y
+}
+```
+
+For conciseness, pack into a `tibble`:
+
+```{r}
+uv.df <- tibble(u=su_interp, v=sv_interp)
+```
+
+For comparing `u` against `v`
+
+Now plot:
+
+```{r}
+qq2.plt =ggplot(data=uv.df) + 
+  geom_point(aes(x=u, y=v)) + 
+  ggtitle("QQ Plot of Two Distinct Uniform Data Sets")
+print(qq2.plt)
+
+```
+
+Repeat with `u` against `x`:
+
+```{r}
+if (length(su)< length(sx)){
+  su_interp <- su
+  # perform a linear interpolation to get a vector of the same length
+  sx_interp <- approx(1:length(sx),sx,n=length(su))$y
+}else{
+  sx_interp <- sx
+  su_interp <- approx(1:length(su),su,n=length(sx))$y
+}
+ux.df <- tibble(u=su_interp, x=sx_interp)
+
+```
+
+Plot:
+
+```{r}
+qq2ux.plt =ggplot(data=ux.df) + 
+  geom_point(aes(x=u, y=x)) + 
+  ggtitle("QQ Plot of Normal and Uniform Data")
+print(qq2ux.plt)
+
+```
+
+# Additional Annotation Tools
+
+Manipulate the `Auto` data set
+
+```{r}
+Auto$origin=as_factor(Auto$origin)
+Auto$cylinders=as_factor(Auto$cylinders)
+```
+
+```{r}
+mpg.plt = ggplot(Auto) # we will reuse this 
+mpg.plt1 = mpg.plt + geom_boxplot(mapping = aes(x=origin, y= mpg))
+print(mpg.plt1)
+```
+
+```{r}
+summary(Auto$origin)
+```
+
+This could be in a caption or the text, but can we get into the figure
+directly?
+
+Add an annotation:
+
+```{r}
+mpg.plt2 = mpg.plt1 + annotate("text", x=c(1.1, 2.1, 3.1), y = c(30, 40, 45), 
+                               label=sprintf("n=%d", summary(Auto$origin)),
+                               color="red")
+print(mpg.plt2)
+```
+
+What did we do:
+
+-   `text` - says the figure annotation will be a text object
+
+-   `x` and `y` - these are selected by guess and check as to where to
+    put the labels
+
+-   `label=sprintf` - this is C/C++ style string formatting.
+
+Alternatively, turn the summary information into a data frame itself:
+
+```{r}
+group_by(Auto, origin)
+```
+
+```{r}
+tally(group_by(Auto, origin))
+```
+
+```{r}
+summary.df= tally(group_by(Auto, origin))
+summary.df
+```
+
+```{r}
+tally(Auto)
+```
+
+```{r}
+Auto %>% group_by(cylinders) %>%tally()
+```
+
+Alternatively, uses pipes: `%>%`
+
+```{r}
+summary.df = Auto %>% group_by(origin) %>% tally()
+```
+
+```{r}
+summary.df
+```
+
+`tally` sums up the data in each case from the `group_by`.
+
+```{r}
+auto.plt = ggplot(Auto) +
+  geom_boxplot(aes(x=origin, y = mpg)) + 
+  geom_label(data=summary.df, aes(x=origin, label=sprintf("n = %d",n)), y =max(Auto$mpg), color="red")
+
+print(auto.plt)
+```
