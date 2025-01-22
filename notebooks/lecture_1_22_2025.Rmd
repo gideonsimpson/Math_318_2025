@@ -1,0 +1,326 @@
+---
+title: "Lecture 1/22/2025"
+output: html_document
+date: "2025-01-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Correlations
+
+## Model Problem
+
+Create data
+
+$$
+y_i = x_i^3 + \epsilon_i
+$$
+
+Think of $\epsilon$ as "noise" in the measurements, and for simplicity, assume $\epsilon_i \sim N(0, \sigma^2)$ for some particular variance, $\sigma$ .
+
+```{r}
+set.seed(100) # set a seed for reproducibility
+x=seq(-5, 5, length=101) # 101 uniformly spaced points between -5 and 5
+xi =  rnorm(length(x)) # cresate a vector of Gaussians with same size as x, N(0,1)
+# look at different magnitude noises
+sigma2_vals = c(0, 10, 50,100, 500) 
+
+# store in a data structure, data frame, with the columns we want
+# preallocate
+df = tibble(x = numeric(), y=numeric(), noise=factor())
+df
+```
+
+```{r}
+#populate the data frame row by row
+for(j in 1:length(sigma2_vals)){
+  sigma2 = sigma2_vals[j] # get the jth coordinate
+  # add noise with variance sigma2 to x^3, each y is also of same size as x
+  y = x^3 + sqrt(sigma2) * xi
+  # add in the rows
+  df =add_row(df, x = x, y = y, noise = as.factor(sigma2))
+}
+df
+```
+
+Treat noise as a categorical value
+
+```{r}
+summary(df)
+```
+
+Example of the `filter` command:
+
+This extracts all the cases with with noise = 10
+
+```{r}
+filter(df, noise == 10)
+```
+
+This extracts the cases with x\>2
+
+```{r}
+filter(df, x>2)
+```
+
+This extracts all the cases with x\>2 AND y\>10
+
+```{r}
+filter(df, (x>2)&(y>10)) # the & is an AND
+```
+
+```{r}
+filter(df, (x>2)&(noise==10)) # the & is an AND
+```
+
+```{r}
+filter(df, (noise==0)|(noise==10)) # the | is an OR
+```
+
+```{r}
+sigma2_vals
+```
+
+```{r}
+length(sigma2_vals)
+```
+
+```{r}
+1:length(sigma2_vals)
+```
+
+```{r}
+correlations=c() # empty to start
+for(j in 1:length(sigma2_vals)){
+  sigma2 = sigma2_vals[j] # look at just the j-th noise case
+  x_filtered = filter(df, noise == sigma2)$x # extract x and y values for this case
+  y_filtered = filter(df, noise == sigma2)$y
+  cor_est = cor(x_filtered, y_filtered) # compute the correlation
+  correlations <- append(correlations, cor_est) # store in the array
+}
+correlations
+```
+
+Greater noise, less correlation. Graphically:
+
+```{r}
+cubic.plt=ggplot(df) + geom_point(aes(x,y))
+cubic.plt = cubic.plt + scale_color_discrete(name="Noise Intensity")
+print(cubic.plt)
+```
+
+Graphically *filter* by noise:
+
+```{r}
+cubic.plt=ggplot(df) + geom_point(aes(x,y, color=noise))
+cubic.plt = cubic.plt + scale_color_discrete(name="Noise Intensity")
+print(cubic.plt)
+```
+
+## Auto Data Set Problem
+
+`Auto` dataframe from `ISLR2` package
+
+```{r}
+Auto
+```
+
+```{r}
+Auto$origin = as.factor(Auto$origin)
+Auto$cylinders = as.factor(Auto$cylinders)
+```
+
+```{r}
+cor(Auto) # many of the features (columns) are not numerical values (real and integer values)
+```
+
+Filter the numerical features:
+
+```{r}
+Auto |> select_if(is.numeric)
+```
+
+Get the pair correlations amongst all the numerical variables:
+
+```{r}
+Auto |> select_if(is.numeric) |> cor()
+```
+
+**NOTE** The matrix is symmetric because
+
+$$
+ \mathrm{Cor}(X,Y) =  \mathrm{Cor}(Y,X) 
+$$
+
+and
+
+$$
+\mathrm{Cor}(X,X) = 1,
+$$
+
+always.
+
+Looking ahead: we will build statistical models with the insight that more strongly correlated variables are more important to the model.
+
+Graphically visualize pair correlations:
+
+```{r}
+pairs(select_if(Auto, is.numeric))
+```
+
+A more elegant plot can be made with `ggpairs` :
+
+```{r}
+library(GGally) # needed for ggpairs
+auto.pairs.plt = ggpairs(select_if(Auto, is.numeric)) + 
+  ggtitle("Pair Correlations for Auto")
+print(auto.pairs.plt)
+```
+
+# More on ggplot
+
+## Facets and Grids
+
+This is a convenient way of visualizing a lot of features in a single figure using subplots
+
+```{r}
+Auto.facet.gplt = ggplot(Auto) + geom_point(aes(horsepower, mpg, color=cylinders))
+Auto.facet.gplt = Auto.facet.gplt + ggtitle("Horsepower vs mpg, by Cylinders")
+print(Auto.facet.gplt)
+```
+
+Layout subplots using `facet_wrap`, controlling for cylinders
+
+```{r}
+Auto.facet.gplt = ggplot(Auto) + geom_point(aes(horsepower, mpg))
+# filters the data by cylinder count and does the hp vs mpg for each case
+Auto.facet.gplt = Auto.facet.gplt + facet_wrap(~cylinders, nrow=2) 
+Auto.facet.gplt = Auto.facet.gplt + ggtitle("Horsepower vs mpg, by Cylinders")
+print(Auto.facet.gplt)
+```
+
+It is cylinders that really drives the MPG differentials.
+
+```{r}
+Auto.facet.gplt = ggplot(Auto) + geom_point(aes(horsepower, mpg))
+Auto.facet.gplt = Auto.facet.gplt + facet_wrap(~origin, nrow=2) # filters the data by origin count and does the hp vs mpg for each case
+Auto.facet.gplt = Auto.facet.gplt + ggtitle("Horsepower vs mpg, by Origin")
+print(Auto.facet.gplt)
+```
+
+We can use `facet_grid` to split along two different categorical variables
+
+```{r}
+Auto.grid.gplt = ggplot(Auto) + geom_point(aes(horsepower, mpg))
+Auto.grid.gplt = Auto.grid.gplt + facet_grid(origin~cylinders) # filter data, simultaneously by origin and cylinders
+Auto.grid.gplt = Auto.grid.gplt+ ggtitle("Horsepower vs mpg, by Cylinders and Origin")
+print(Auto.grid.gplt)
+```
+
+It's really the cylinder count that's controlling hp vs. mpg, not origin.
+
+## QQ Plots (revisited)
+
+Is MPG normally distributed?
+
+```{r}
+auto.qq1.plt <- ggplot(Auto, aes(sample=mpg))+geom_qq()+geom_qq_line()
+print(auto.qq1.plt)
+
+```
+
+```{r}
+auto.hist1.plt <- ggplot(Auto, aes(x=mpg))+geom_histogram(bins=10)
+print(auto.hist1.plt)
+
+```
+
+This is not normally distributed. Not symmetric.
+
+```{r}
+auto.hist1.plt <- ggplot(Auto|>filter(cylinders==4), aes(x=mpg))+geom_histogram(bins=10) + ggtitle("All 4 Cylinder Cars")
+print(auto.hist1.plt)
+
+```
+
+What happens if we break out by origin?
+
+```{r}
+auto.qq2.plt <- ggplot(Auto, aes(sample=mpg, color=origin))+geom_qq()+geom_qq_line()
+print(auto.qq2.plt)
+
+```
+
+Region 3 looks normal, region 2 is almost normal, region 1 is not.
+
+What about cylinders?
+
+```{r}
+auto.qq2.plt <- ggplot(Auto, aes(sample=mpg, color=cylinders))+geom_qq()+geom_qq_line()
+print(auto.qq2.plt)
+
+```
+
+# Confidence Intervals
+
+We will build CI's of the form (95% case)
+
+$$
+(\bar{x}_N - 1.96\sigma_N/\sqrt{N},\bar{x}_N + 1.96\sigma_N/\sqrt{N})
+$$
+
+or, more generally,
+
+$$
+(\bar{x}_N - z_{1-\alpha/2}\sigma_N/\sqrt{N},\bar{x}_N +  z_{1-\alpha/2}\sigma_N/\sqrt{N})
+$$
+
+and
+
+$$
+\text{Standard Error} = \frac{\sigma_N}{\sqrt{N}}
+$$
+
+where $\sigma_N$ is the sample standard deviation.
+
+## Naive Computation
+
+Generate some data, then compute the CI for the mean.
+
+```{r}
+set.seed(100)
+x = rexp(100) # exponentially distributed random variables, not Gaussian
+```
+
+```{r}
+hist(x)
+```
+
+Pick an $\alpha$, $\alpha = 0.05$ and compute the CI:
+
+```{r}
+alpha = .05
+z = qnorm(1-alpha/2) # qnorm is the inverse CDF (quantile function) for N(0,1)
+z
+```
+
+```{r}
+qnorm(alpha/2) # NOTE, this the negative
+```
+
+The CI for the mean (really 1) is then:
+
+```{r}
+xbar = mean(x)
+sigma= sqrt(var(x))
+N = 100;
+CI = c(xbar - z * sigma/sqrt(N),xbar + z * sigma/sqrt(N))
+CI
+```
