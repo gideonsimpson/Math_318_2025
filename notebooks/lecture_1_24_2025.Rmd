@@ -1,0 +1,368 @@
+---
+title: "Lecture 1/24/2025"
+output: html_document
+date: "2025-01-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Confidence Intervals
+
+We will build CI's of the form (95% case)
+
+$$
+(\bar{x}_N - 1.96\sigma_N/\sqrt{N},\bar{x}_N + 1.96\sigma_N/\sqrt{N})
+$$
+
+or, more generally,
+
+$$
+(\bar{x}_N - z_{1-\alpha/2}\sigma_N/\sqrt{N},\bar{x}_N +  z_{1-\alpha/2}\sigma_N/\sqrt{N})
+$$
+
+and
+
+$$
+\text{Standard Error} = \frac{\sigma_N}{\sqrt{N}}
+$$
+
+where $\sigma_N$ is the sample standard deviation.
+
+## Naive Computation
+
+Generate some data, then compute the CI for the mean.
+
+```{r}
+set.seed(100)
+x = rexp(100) # exponentially distributed random variables, not Gaussian
+```
+
+These are samples from $\mathrm{exp}(1)$, the exponential distribution with parameter $1$ by default. This has density $e^{-x}$ on $[0,\infty)$
+
+```{r}
+hist(x)
+```
+
+Pick an $\alpha$, $\alpha = 0.05$ and compute the CI (for the $1-\alpha$ % CI):
+
+```{r}
+alpha = .05
+z = qnorm(1-alpha/2) # qnorm is the inverse CDF (quantile function) for N(0,1)
+z
+```
+
+```{r}
+qnorm(alpha/2) # NOTE, this the negative
+```
+
+The CI for the mean (really 1) is then:
+
+```{r}
+xbar = mean(x)
+sigma= sqrt(var(x))
+N = 100;
+CI = c(xbar - z * sigma/sqrt(N),xbar + z * sigma/sqrt(N))
+CI
+```
+
+CLAIM: True mean is 1 for this example
+
+## T-Test
+
+In the above computation, we assumed $N$ was large enough for the Central Limit Theorem to take over. But sometimes $N$ is too small, and/or the variance is too large. Use the t-test, or Student $t$ distribution to compensate. Like the Central Limit Theorem for small $N$
+
+```{r}
+t.test(x)
+```
+
+Defaults to 95% case (they all do).
+
+```{r}
+t.test(x,conf.level=0.99)
+```
+
+For $N$ large enough (typically $N>30$), T-Test will be the same as the CLT result.
+
+# Data Frame Manipulation
+
+Create a toy data frame:
+
+```{r}
+toy.df = tibble(x=1:3, y = 4:6)
+```
+
+```{r}
+toy.df
+```
+
+Two features (columns), `x` and `y` , and 3 samples.
+
+We want to add a new sample:
+
+```{r}
+add_row(toy.df, x=5, y = -8)
+```
+
+This did not alter `toy.df`. Need to assign it.
+
+```{r}
+toy.df
+```
+
+```{r}
+toy2.df = add_row(toy.df, x=5, y = -8)
+```
+
+```{r}
+toy.df
+```
+
+```{r}
+toy2.df
+```
+
+Piping - language feature of R, and it's built around the command `|>` :
+
+Example:
+
+```{r}
+toy3.df =toy.df |> add_row(x=5, y = -8)
+toy3.df
+```
+
+Add a feature:
+
+```{r}
+toy.df |> add_column(day=c("Monday", "Friday", "Saturday"))
+```
+
+`toy.df` is unchanged:
+
+```{r}
+toy.df
+```
+
+Piping features and samples:
+
+```{r}
+toy.final.df = toy.df |> 
+  add_column(day=c("Monday", "Friday", "Saturday")) |>  
+  add_row(x=5, y = -8, day="Blaturday")
+```
+
+```{r}
+toy.final.df
+```
+
+## Merging Data Frames
+
+Working with the Wine data sets form [Wine Quality - UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/186/wine+quality). This has scores by wine experts and chemical measurements. Two challenges:
+
+-   Two different data sets for red and white; read in each
+
+-   Semi-colon separated, instead of comma separated; use `sep=";"`
+
+```{r}
+white.df = read.csv("~/code/Math_318_2025/data/wine+quality/winequality-white.csv", sep=";")  |>  
+  as_tibble()
+white.df
+```
+
+`read.csv` returns a default R data frame, we then pipe it in, `|>` to make a tibble.
+
+```{r}
+red.df = read.csv("~/code/Math_318_2025/data/wine+quality/winequality-red.csv", sep=";") |> 
+  as_tibble()
+red.df
+```
+
+Use `union_all` to combine data frames:
+
+```{r}
+attempt1.df = union_all(white.df, red.df)
+attempt1.df
+```
+
+**NOTE** we have lost information as to wine color. Go back, add the feature and then join:
+
+```{r}
+white.df = white.df |>  add_column(color="white")
+white.df
+```
+
+```{r}
+red.df = red.df |> add_column(color="red")
+red.df
+```
+
+Now combine:
+
+```{r}
+wine.df = union_all(white.df, red.df)
+wine.df
+```
+
+## Cleaning Data
+
+Create a data frame with a missing entry:
+
+```{r}
+x=1:10
+y = x^2 
+y[4]=NA # put a missing entry into the data
+messy.df = tibble(x=x, y=y)
+messy.df
+```
+
+Filter out samples with missing entries:
+
+```{r}
+clean.df = messy.df |>  na.omit() # drops samples with missing entries
+clean.df
+```
+
+# More Data Frame Manipulation
+
+Work with the `Auto` data set
+
+```{r}
+library(ISLR2)
+```
+
+```{r}
+Auto |> as_tibble() -> Auto # converts to a tibble and saves it
+```
+
+```{r}
+Auto |>filter(cylinders==3)
+```
+
+```{r}
+Auto |>filter(cylinders==4)
+```
+
+```{r}
+Auto |>filter(cylinders==3)|>select(year) # only return the specified feature
+```
+
+```{r}
+Auto|>select(year)|>summary()
+```
+
+```{r}
+Auto |>filter(cylinders==4)|>select(year) |> summary()
+```
+
+# Pivoting
+
+Make the sample stock data:
+
+```{r}
+set.seed(100)
+stocks.df = tibble(date=as.Date('2024-01-01')+0:9, "Apple"=100+cumsum(rnorm(10,0,4)),
+                   "Google"=25+cumsum(rnorm(10,0,2)),
+                   "Wawa"=10+cumsum(rnorm(10,0,0.5)))
+```
+
+```{r}
+stocks.df
+```
+
+Closing prices of the three stocks on the specified dates.
+
+Reasonable table format.
+
+Easy to visualize individual stocks:
+
+```{r}
+plt = ggplot(stocks.df,mapping=aes(date,Apple))+geom_point()
+print(plt)
+```
+
+But it would be nice to get all stocks at once, color coded, etc
+
+## Pivot Longer
+
+```{r}
+stocks.long.df = stocks.df|>pivot_longer(cols=!date,
+                        names_to="symbol",
+                        values_to="price")
+```
+
+```{r}
+stocks.long.df
+```
+
+`pivot_longer` replaces `gather`
+
+```{r}
+stocks.long.df = stocks.df|>gather(key=symbol, value=price,-date)
+
+```
+
+```{r}
+stocks.long.df
+```
+
+```{r}
+stocks.plt = ggplot(stocks.long.df,mapping=aes(date,price,color=symbol))+geom_point()
+print(stocks.plt)
+```
+
+## Pivot Wider
+
+Suppose we want to undo what we did
+
+```{r}
+stocks.long.df |> pivot_wider(names_from=symbol, values_from=price)
+```
+
+`pivot_wider` replaces `spread`
+
+# Kables
+
+To make nicely formatted tables that can be repsented, we use `kables` . These can be exported to Word, HTML, and Latex.
+
+```{r}
+library(knitr) # this provies the kable
+library(kableExtra) # this provides formatting features for kables
+```
+
+```{r}
+kable(stocks.df)
+```
+
+```{r}
+kable(Auto) # this prints row "names", 1,2 ,3, 4...
+```
+
+```{r}
+kable(Auto, row.names = FALSE)
+```
+
+Formatting kables:
+
+```{r}
+stocks.kb = kable(stocks.df, caption="Stocks Example")|> 
+  kable_classic("striped", font_size=14)
+stocks.kb
+```
+
+```{r}
+stocks.kb = kable(stocks.df, caption="Stocks Example")|>  
+  kable_classic(full_width=FALSE,"striped", font_size=14)
+stocks.kb
+```
+
+```{r}
+stocks.kb = kable(stocks.df, caption="Stocks Example")|> 
+  kable_material(full_width=FALSE,"striped", font_size=10)
+stocks.kb
+```
