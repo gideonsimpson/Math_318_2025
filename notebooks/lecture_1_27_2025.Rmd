@@ -1,0 +1,67 @@
+---
+title: "Lecture 1/27/2025"
+output: html_document
+date: "2025-01-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Intro to Regression
+
+## Create some toy data
+
+These are $(x_i, y_i)$ pairs, stored in a `tibble`:
+
+```{r}
+set.seed(100) # for random noise
+x= seq(0, 10, length=15) # 15 uniformly spaced points between 0 and 10
+beta0 = 2.
+beta1 = -1.5
+y = beta0 + beta1 * x + 2 * rnorm(length(x)) # Y = β0 + β1 * X + ε
+df = tibble(x=x, y=y)
+df
+```
+
+## Regression Tool
+
+Fundamental tool in R is `lm` for linear model:
+
+```{r}
+lm1 = lm(y~x, df)
+```
+
+```{r}
+lm1
+```
+
+So is supposed to learn 2 and -1.5, and we see that, approximately.
+
+-   `(Intercept)` corresponds to $\hat{\beta}_0$
+
+-   `x` corresponds to $\hat{\beta}_1$
+
+```{r}
+summary(lm1)
+```
+
+The `t-value` and `Pr(>|t|)` are the statistical test values, for the t-test, that each coefficient is nonzero. Here, the t-score is significant at the 0.001 level.
+
+## Regression with ggplot2
+
+There is a built in visualization of the linear model:
+
+```{r}
+plt = ggplot(df, aes(x=x,y=y)) + 
+  geom_point() + 
+  geom_smooth(method=lm)
+print(plt)
+```
+
+This visualizes the raw data, the linear model, and the 95% confidence interval about the regressed linear model. **NOTE**: 6 of the points are NOT in the CI.
