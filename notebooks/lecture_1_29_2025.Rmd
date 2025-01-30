@@ -1,0 +1,93 @@
+---
+title: "Lecture 1/29/2025"
+output: html_document
+date: "2025-01-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Linear Regression
+
+Generate data:
+
+```{r}
+set.seed(100) # for random noise
+x= seq(0, 10, length=15) # 15 uniformly spaced points between 0 and 10
+beta0 = 2.
+beta1 = -1.5
+y = beta0 + beta1 * x + 2 * rnorm(length(x)) # Y = β0 + β1 * X + ε
+df = tibble(x=x, y=y)
+df
+```
+
+```{r}
+lm1 = lm(y~x, df)
+```
+
+## Assessing goodness of fit
+
+```{r}
+summary(lm1)
+```
+
+# Confidence and Prediction Intervals for the Model
+
+## Confidence Intervals
+
+```{r}
+confint(lm1)
+```
+
+These are fairly broad for the true value of $\beta_0$ and $\beta_1$.
+
+The shaded region in this figure defaults to 95% CI for $\beta_0 +\beta_1 X$
+
+```{r}
+plt = ggplot(df, aes(x=x,y=y)) + geom_point()+geom_smooth(method=lm)
+print(plt)
+```
+
+## Prediction Intervals
+
+Construct a prediction interval:
+
+```{r}
+predict(lm1,df, interval="prediction")
+# predict(lm1,df, interval="prediction", level = .99)
+```
+
+Each row corresponds to the $x_i$ in the df , giving the estimated $\hat{\beta_0} + \hat{\beta_1}x_i$ and the upper and lower prediction interval (defaulting to 95%) on the corresponding $y_i$.
+
+## Visualization
+
+To get into the figure, store in a data frame:
+
+```{r}
+pred.df = as_tibble(predict(lm1,df, interval="prediction"))
+```
+
+```{r}
+plt = ggplot(df, aes(x=x,y=y)) + geom_point()+geom_smooth(method=lm) + 
+  geom_ribbon(data = pred.df, aes(ymin = lwr, ymax = upr), fill="red", alpha = .2)
+print(plt)
+```
+
+alpha is the transparency level.
+
+CI is measuring the uncertainty in the trend line, $\hat{\beta}_0 +\hat{\beta}_1 x$ and the prediction interval measure the uncertainty in $y$
+
+Alternatively way of capturing the prediction interval (with lines):
+
+```{r}
+plt = ggplot(df, aes(x=x,y=y)) + geom_point()+geom_smooth(method=lm) + 
+  geom_line(data = pred.df, aes(y=lwr),linetype="dashed") +
+  geom_line(data = pred.df, aes(y=upr),linetype="dashed")
+print(plt)
+```
