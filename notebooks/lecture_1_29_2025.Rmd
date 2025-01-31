@@ -50,7 +50,7 @@ These are fairly broad for the true value of $\beta_0$ and $\beta_1$.
 The shaded region in this figure defaults to 95% CI for $\beta_0 +\beta_1 X$
 
 ```{r}
-plt = ggplot(df, aes(x=x,y=y)) + geom_point()+geom_smooth(method=lm)
+plt = ggplot(df, aes(x=x,y=y)) + geom_point()+geom_smooth(method=lm) +geom_abline(intercept = beta0,slope = beta1)
 print(plt)
 ```
 
@@ -59,7 +59,7 @@ print(plt)
 Construct a prediction interval:
 
 ```{r}
-predict(lm1,df, interval="prediction")
+predict(lm1,df, interval="prediction") # defaults to 95% confidence
 # predict(lm1,df, interval="prediction", level = .99)
 ```
 
@@ -79,7 +79,7 @@ plt = ggplot(df, aes(x=x,y=y)) + geom_point()+geom_smooth(method=lm) +
 print(plt)
 ```
 
-alpha is the transparency level.
+`alpha` is the transparency level.
 
 CI is measuring the uncertainty in the trend line, $\hat{\beta}_0 +\hat{\beta}_1 x$ and the prediction interval measure the uncertainty in $y$
 
