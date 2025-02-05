@@ -1,0 +1,351 @@
+---
+title: "Lecture 2/5/2025"
+output: html_document
+date: "2025-02-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Nearest Neighbors Regression
+
+Need `FNN` for nearest neighbors regression:
+
+```{r}
+library(FNN)
+```
+
+## Create Toy Data
+
+$$
+Y = X + \sin(2\pi X) (1+\epsilon)
+$$
+
+where $\epsilon\approx N(0,\gamma^2)$ random noise,
+
+Think of this as the *training* data set:
+
+```{r}
+set.seed(100)
+n = 100
+x = runif(n, min =0, max = 10)
+y = x + sin(2*pi*x)* (1+.1 * rnorm(x)) # noisy versions of y = x + sin(2*pi*x)
+xy.df = tibble(x=x,y=y)
+xy.df
+
+```
+
+Define a scalar real valued function in R:
+
+```{r}
+true_f = function(x){x+ sin(2*pi*x)}
+true_f(5.25)
+```
+
+```{r}
+plt = ggplot(xy.df, aes(x,y))+geom_point() +
+  stat_function(fun=true_f,linetype="dashed", color="red")
+print(plt)
+```
+
+## Create the Test Points
+
+These are points for which we want to evaluate our model:
+
+```{r}
+test.x = seq(0,10,,length.out=200)
+test.df = tibble(x=test.x, y = rep(0, length(test.x)))
+test.df
+```
+
+We want to the same structure as the other data frame, so we pad the `y` value with 0's. We could also do `NA` .
+
+The kNN method assumes we are working with **matrices** not data frames:
+
+```{r}
+test.df[,1] # need this as a matrix
+```
+
+Reinterpret it as a 1 column matrix:
+
+```{r}
+as.matrix(test.df[,1])
+```
+
+## Predict
+
+```{r}
+y_pred= knn.reg(as.matrix(xy.df[,1]),
+                test=as.matrix(test.df[,1]),
+                as.matrix(xy.df[,2]),
+                k=3)
+```
+
+`knn.reg` takes 4 arguments:
+
+-   The first argument are the x coordinates of the data we have
+
+-   The third argument are the y coordinates (the response variable) of the data we have
+
+-   The second argument are the new points we want to evaluate/estimate at
+
+-   The fourth argument is how many neighbors to use
+
+This returns a data structure, and the predicted values are stored in teh `pred` entry:
+
+```{r}
+print(y_pred) # the data structure
+y_pred$pred # the array of predicted values
+```
+
+**NOTE** This goes directly to predictions, there is no intermediate fitting of coefficients as with `lm`
+
+Visualize and come to what this means:
+
+```{r}
+test.df$y =y_pred$pred
+plt = ggplot(xy.df, aes(x,y))+geom_point() +
+  stat_function(fun=true_f,linetype="dashed", color="red") +
+  geom_point(test.df, mapping=aes(x,y),color="blue",)
+print(plt)
+```
+
+## Questions
+
+-   What happens when $k$ gets big? This smooths out, and as $k$ approaches the size of hte data set, it will predict the sample mean, $\bar{y}$ for all test values of $x$
+
+-   What happens if we had a lot less data? It struggles when there is a shortage of data.
+
+# More Tables
+
+Exporting for Excel/Word/etc.
+
+Standard approach is to turn into something that can exported as a CSV file, and then use `write_csv`
+
+## Simple example
+
+```{r}
+set.seed(123)
+xdata = rnorm(20)
+xdata
+```
+
+Store as a data frame, first:
+
+```{r}
+xdata.df = tibble(x=xdata)
+xdata.df
+```
+
+```{r}
+write_csv(xdata.df, "simple1.csv")
+```
+
+This `.csv` can then be read into Excel/Word/etc.
+
+### Getting the summary out
+
+```{r}
+summary(xdata.df)
+```
+
+This does NOT work
+
+```{r}
+summary.df = as_tibble(summary(xdata.df))
+```
+
+If we can't turn this into a data frame, we can't export as a `.csv`
+
+Instead, we use the `summarize` command:
+
+```{r}
+xdata.df |> summarize(mean(x))
+```
+
+```{r}
+xdata.df |>  summarize(mean(x), median(x))
+```
+
+We can reconstruct the full `summary` output in tibble format:
+
+```{r}
+xdata.df |>  summarize(min(x), 
+                       quantile(x,0.25),
+                       median(x),
+                       mean(x),
+                       quantile(0,0.75),
+                       max(x))
+```
+
+```{r}
+xdata.summary.df = xdata.df |>  summarize(min(x), 
+                       quantile(x,0.25),
+                       median(x),
+                       mean(x),
+                       quantile(0,0.75),
+                       max(x))
+```
+
+```{r}
+write_csv(xdata.summary.df, "xsummary.csv")
+```
+
+Suppose we want transpose for exporting,
+
+```{r}
+t(xdata.summary.df)
+```
+
+```{r}
+names(xdata.summary.df)
+```
+
+```{r}
+cbind(stat=names(xdata.summary.df), t(xdata.summary.df))
+```
+
+```{r}
+xdata.summary.df.t = as_tibble(cbind(stat=names(xdata.summary.df), t(xdata.summary.df)))
+```
+
+```{r}
+xdata.summary.df.t
+```
+
+```{r}
+write_csv(xdata.summary.df.t, "xsummaryt.csv")
+```
+
+## mtcars example
+
+```{r}
+mtcars # built in data set
+```
+
+Convert to tibble, and keep the row names:
+
+```{r}
+mtcars.df = as_tibble(mtcars, rownames="model") # need the rownames to retain the information
+mtcars.df
+```
+
+```{r}
+summary(mtcars.df)
+```
+
+To the export the summary for each property, we first use `pivot_longer` :
+
+```{r}
+mtcars.long.df = pivot_longer(mtcars.df, names_to ="property", values_to = "value", -model)
+mtcars.long.df
+```
+
+This gets us closer to where we want.
+
+```{r}
+mtcars.long.df|> group_by(property) |>  summarize(Mean=mean(value), 
+                                                    Median=median(value))
+```
+
+```{r}
+mtcars.stats = mtcars.long.df |> 
+  group_by(property) |> 
+  summarize(Mean=mean(value), 
+            Median=median(value))
+write_csv(mtcars.stats, "mtcars1.csv")
+```
+
+Can also use these with `kable`
+
+### Transposed layout
+
+```{r}
+mtcars.stats.t = as_tibble(t(mtcars.stats[-1]), rownames="stat")
+mtcars.stats.t
+```
+
+But notice we've lost the labels on top.
+
+```{r}
+mtcars.stats$property
+```
+
+See the column names:
+
+```{r}
+names(mtcars.stats.t)
+```
+
+Exclude the first one, as it is correct:
+
+```{r}
+names(mtcars.stats.t[-1])
+```
+
+Reassign the names:
+
+```{r}
+names(mtcars.stats.t)[-1] = mtcars.stats$property
+```
+
+```{r}
+mtcars.stats.t
+```
+
+This can now be exported
+
+# Classifiers
+
+## Linear Model
+
+Look `Default` data set. This is from `ISLR2`
+
+```{r}
+Default = as_tibble(Default) 
+Default
+```
+
+Would like to predict if someone will default, based on the other features (student, balance, and income).
+
+Try to fit a linear model,
+
+$$
+Y \approx \beta_0 + \beta_1 \times \text{balance} 
+$$
+
+Visualize this:
+
+```{r}
+lm.plt = ggplot(Default, aes(x=balance, y = as.numeric(default) -1)) +geom_point()
+print(lm.plt)
+```
+
+**NOTE** `as.numeric` turns the categorical variables into 1,2, 3, etc. as appropriate:
+
+```{r}
+ as.numeric(Default$default)[1:500]
+```
+
+`1` corresponds to `no` and `2` corresponds to `yes` . Subtract 1 to get 0 and 1's:
+
+```{r}
+ as.numeric(Default$default)[1:500]-1
+```
+
+Add the regression in:
+
+```{r}
+lm.plt= lm.plt + geom_smooth(method=lm, formula = y~x)
+print(lm.plt)
+```
+
+Gives numbers between, $\approx (-0.1, 0.3)$ , terrible for making predictions of default or not.
+
+This is an example of why linear regression is terrible for classification problems.
