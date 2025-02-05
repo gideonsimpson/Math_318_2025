@@ -51,3 +51,9 @@ rsconnect/
 # generated files
 *.pdf
 *.nb.html
+
+# mac files
+.DS_Store
+
+# vscode
+.vscode/
