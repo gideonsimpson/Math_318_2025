@@ -1,0 +1,49 @@
+---
+title: "Lecture 2/7/2025"
+output: html_document
+date: "2025-02-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ISLR2)
+```
+
+# Classifiers
+
+## Logistic Regression
+
+```{r}
+logistic.glm.plt = ggplot(Default, aes(x=balance, y = as.numeric(default) -1)) +geom_point()
+logistic.glm.plt = logistic.glm.plt + 
+  geom_smooth(method = glm, formula = y~x, method.args = list(family="binomial"))
+print(logistic.glm.plt)
+```
+
+We have used `glm` instead of `lm` , and we have used `binomial` to set to logistic regression.
+
+Getting the underlying classifier model:
+
+```{r}
+logistic.glm = glm(default~balance, data=Default, family = binomial)
+```
+
+```{r}
+logistic.glm
+```
+
+The coefficients are the $\beta_0$ and the $\beta_1$ in the logistic model.
+
+```{r}
+summary(logistic.glm)
+```
+
+and we can get confidence intervals on the coefficients
+
+```{r}
+confint(logistic.glm)
+```
