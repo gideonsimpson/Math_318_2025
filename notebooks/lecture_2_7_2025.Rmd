@@ -47,3 +47,102 @@ and we can get confidence intervals on the coefficients
 ```{r}
 confint(logistic.glm)
 ```
+
+## Predictions and Accuracy
+
+To the predictions, we use `predict` :
+
+```{r}
+pred.prob = predict(logistic.glm, type="response") # defaults to predicting the responses in training data
+pred.prob[1:5]
+```
+
+`pred.prob` contains the predicted default probabilities. To turn these into classes (`No` or `Yes` ):
+
+```{r}
+default.pred = rep("No", length(pred.prob)) # set everyone to No initially,
+default.pred[pred.prob>0.5]="Yes" # flips all the indices where p > 0.5 to Yes
+```
+
+Check accuracy:
+
+```{r}
+mean(as.numeric(default.pred != Default$default))
+```
+
+The above computes:
+
+$$
+\frac{1}{n} 1_{\hat{y}_i \neq y_i}
+$$
+
+The error rate. 2.75%.
+
+## Confusion Matrix
+
+```{r}
+table(default.pred, Default$default)
+```
+
+What our model is missing. The off diagonal entries are the mismatches. This model predicts 142 defaults, even though 42 of them will not. The data has 333 defaults, and the model only catches 100 of them.
+
+# Training/Testing
+
+## Splitting the Data
+
+Naive choice is to give the first 70% ( or 50%) of the data to the training set:
+
+```{r}
+# train.idx = 1:floor(0.7*nrow(Default)) # gives the indexes, 1,2,..., to approximately the 70% of the total number of samples
+# randomly indices
+train.idx = sample(nrow(Default),floor(0.7*nrow(Default)), replace = FALSE)
+```
+
+```{r}
+train.idx
+```
+
+Extract training rows:
+
+```{r}
+train.df = Default[train.idx,]
+train.df
+```
+
+Getting the testing rows is a nice feature of R:
+
+```{r}
+test.df = Default[-train.idx,] #excludes the rows in the training data
+test.df
+```
+
+Train and compare errors:
+
+```{r}
+logistic.train = glm(default~balance, data = train.df, family=binomial)
+logistic.train
+```
+
+```{r}
+# get predicted probabiliities of Yes, will default
+train.prob = predict(logistic.train, newdata = train.df, type="response")
+# turn probabilities into classes
+train.pred = rep("No", nrow(train.df))
+train.pred[train.prob>0.5] = "Yes"
+train.pred[1:5]
+```
+
+```{r}
+mean(as.numeric(train.pred != train.df$default))
+```
+
+```{r}
+# get predicted probabiliities of Yes, will default
+test.prob = predict(logistic.train, newdata = test.df, type="response")
+# turn probabilities into classes
+test.pred = rep("No", nrow(test.df))
+test.pred[test.prob>0.5] = "Yes"
+mean(as.numeric(test.pred != test.df$default))
+```
+
+Since these error rates are similar, we would say we had done a good job **given** our assumptions (i.e. logistic classifier with 1 predictor).
