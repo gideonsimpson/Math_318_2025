@@ -8,6 +8,11 @@ date: "2025-02-07"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(ISLR2)
+library(tidyverse)
+```
+
 # Training/Testing
 
 ## Splitting the Data
@@ -15,10 +20,15 @@ knitr::opts_chunk$set(echo = TRUE)
 Naive choice is to give the first 70% ( or 50%) of the data to the training set:
 
 ```{r}
-# train.idx = 1:floor(0.7*nrow(Default)) # gives the indexes, 1,2,..., to approximately the 70% of the total number of samples
-# randomly indices
+# gives the indexes, 1,2,..., to approximately the 70% of the total number of samples
+# train.idx = 1:floor(0.7*nrow(Default)) 
+# random indices
 train.idx = sample(nrow(Default),floor(0.7*nrow(Default)), replace = FALSE)
 ```
+
+`sample(n,k,replace=FALSE)` generates `k` samples from $1\ldots n$, without replacement.
+
+Randomizing the indices does not significantly impact this example. Still, we want to randomly sample the data in the case that it was sorted as it was entered, or some other bias was introduced.
 
 ```{r}
 train.idx
@@ -38,12 +48,18 @@ test.df = Default[-train.idx,] #excludes the rows in the training data
 test.df
 ```
 
+## Train
+
 Train and compare errors:
 
 ```{r}
 logistic.train = glm(default~balance, data = train.df, family=binomial)
 logistic.train
 ```
+
+## Compare Training/Testing errors
+
+Here, we are using as threshold $p_t=0.5$
 
 ```{r}
 # get predicted probabiliities of Yes, will default
@@ -53,6 +69,8 @@ train.pred = rep("No", nrow(train.df))
 train.pred[train.prob>0.5] = "Yes"
 train.pred[1:5]
 ```
+
+Compute mean error rate on the training data set
 
 ```{r}
 mean(as.numeric(train.pred != train.df$default))
@@ -68,3 +86,104 @@ mean(as.numeric(test.pred != test.df$default))
 ```
 
 Since these error rates are similar, we would say we had done a good job **given** our assumptions (i.e. logistic classifier with 1 predictor).
+
+# Logistic Classifiers with Two Predictors
+
+Can we do better in the `Default` data set with more than predictor? Try training against `balance` and `income`.
+
+Look at data graphically, when plotting against both features
+
+```{r}
+logistic.plt = ggplot(Default, aes(shape=default, color=default)) +
+  geom_point(aes(balance, income))
+print(logistic.plt)
+```
+
+Clearly a muddled region around, say, balance = 1500, where it's ambiguous. Really need another feature to best distinguish these two classes. More samples is unlikely to resolve the issue.
+
+```{r}
+logistic2d.train = glm(default~balance+income, data = train.df, family=binomial)
+logistic2d.train
+```
+
+Could then do testing/training comparison on this:
+
+```{r}
+# get predicted probabiliities of Yes, will default
+train2d.prob = predict(logistic2d.train, newdata = train.df, type="response")
+# turn probabilities into classes
+train2d.pred = rep("No", nrow(train.df))
+train2d.pred[train2d.prob>0.5] = "Yes"
+mean(as.numeric(train2d.pred != train.df$default))
+```
+
+```{r}
+test2d.prob = predict(logistic2d.train, newdata = test.df, type="response")
+# turn probabilities into classes
+test2d.pred = rep("No", nrow(test.df))
+test2d.pred[test2d.prob>0.5] = "Yes"
+mean(as.numeric(test2d.pred != test.df$default))
+```
+
+These are comparable.
+
+# Gaussian Mixture Models
+
+## Generate Data
+
+The $\pi = (\pi_1, \pi_2)$ is often referred to as the *prior*
+
+```{r}
+set.seed(100) 
+# set an array with means -2, 1 
+m = c(-2, 1)
+# set an array of std. dev's to 2 and 1 
+sigma = c(2., 0.5) 
+# set an array of prior probabilities
+prior = c(0.4, 0.6) 
+# set number of samples 
+n = 10^4
+
+```
+
+```{r}
+# sampling from the classes according to the prior
+
+# This samples from {1,2}, n times, with replacement
+
+# with P(1) = prior[1] and P(2) = prior[2]
+
+class= sample(1:2,n,replace = TRUE, prob = prior)
+# interpret as a categorical variable 
+class = as.factor(class) # these are the hidden variables
+# preallocates the x array
+x = numeric(n) 
+# populates the x array 
+for(j in 1:n){
+  x[j] =rnorm(1,mean = m[class[j]], sd = sigma[class[j]]) 
+  } 
+# store data as a data frame 
+mixture.df = tibble("class"=class, "x"=x)
+```
+
+## Visualize
+
+```{r}
+
+# construct a histogram of just the x values
+hist.all = ggplot(mixture.df, aes(x)) + geom_histogram(bins = 50) +
+ggtitle("All Data") 
+# show the plot 
+print(hist.all)
+```
+
+It appears to be bimodal.
+
+```{r}
+# alpha sets transparency, use position="identity" to split # the histogram by classes 
+hist.split = ggplot(mixture.df, aes(x=x, fill=class)) + 
+  geom_histogram(alpha=0.5, bins=50, position ="identity") + 
+  ggtitle("Data Split by Class") + labs(fill="Class")
+#show the plot 
+print(hist.split)
+```
