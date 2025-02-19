@@ -1,0 +1,327 @@
+---
+title: "Lecture 2/19/2025"
+output: html_document
+date: "2025-02-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ISLR2)
+library(MASS) # for LDA and QDA regressions
+library(FNN)
+```
+
+# Nonlinear Boundaries
+
+## Data
+
+Generate and visualize
+
+```{r}
+n = 10^3
+x <- runif(n,-0.5,0.5)
+y <- runif(n,0,1)
+# the following turns the boolean TRUE/FALSE into integer 1/0
+class= factor(1-as.integer(x< 0.25 * sin(2 * pi * y)))
+train.df=tibble("x"=x, "y"=y,"class"=class)
+
+nonlinear.plt=ggplot(train.df, aes(color=class)) + 
+  geom_point(aes(x=x,y=y)) + 
+  theme_classic()
+print(nonlinear.plt)
+
+```
+
+The classes are completely distinct, but have a nonlinear boundary.
+
+Testing data,
+
+```{r}
+x=runif(n,-.5,.5)
+y=runif(n,0,1)
+class=factor(1-as.integer(x< 0.25 * sin(2 * pi * y)))
+test.df=tibble("x"=x, "y"=y, "class"=class)
+
+```
+
+## Train and Compare
+
+Train several different classifiers and see how they do
+
+```{r}
+# logistic classifier
+logistic.fit <- glm(class~x+y, train.df, family = binomial)
+logistic.train.prob <- predict(logistic.fit, type = "response")
+logistic.train.pred<- rep(0, nrow(train.df))
+logistic.train.pred[logistic.train.prob>0.5] <- 1
+print(sprintf("Logistic Training Error Rate =%g",
+              mean(logistic.train.pred != train.df$class)))
+
+logistic.test.prob <- predict(logistic.fit, test.df, type = "response")
+logistic.test.pred<- rep(0, nrow(test.df))
+logistic.test.pred[logistic.test.prob>0.5] <- 1
+print(sprintf("Logistic Testing Error Rate =%g",
+              mean(logistic.test.pred != test.df$class)))
+
+# LDA classifier
+lda.fit <- lda(class~x+y, train.df)
+lda.train.pred <- predict(lda.fit)
+print(sprintf("LDA Training Error Rate =%g",
+              mean(lda.train.pred$class != train.df$class)))
+
+lda.test.pred <- predict(lda.fit, newdata = test.df)
+print(sprintf("LDA Testing Error Rate =%g",
+              mean(lda.test.pred$class != test.df$class)))
+
+# QDA classifier
+qda.fit <- qda(class~x+y, train.df)
+qda.train.pred <- predict(qda.fit)
+print(sprintf("QDA Training Error Rate =%g",
+              mean(qda.train.pred$class != train.df$class)))
+
+qda.test.pred <- predict(qda.fit, test.df)
+print(sprintf("QDA Testing Error Rate =%g",
+              mean(qda.test.pred$class != test.df$class)))
+
+# KNN classifier
+knn.train.pred <- knn(as.matrix(train.df[1:2]), as.matrix(train.df[1:2]),
+                as.matrix(train.df[3]), k=3)
+print(sprintf("KNN k=3 Training Error Rate =%g",
+              mean(knn.train.pred != train.df$class)))
+
+knn.test.pred <- knn(as.matrix(train.df[1:2]), as.matrix(test.df[1:2]),
+                      as.matrix(train.df[3]), k=3)
+print(sprintf("KNN k=3 Testing Error Rate =%g",
+              mean(knn.test.pred != test.df$class)))
+
+```
+
+Since testing/training errors are comparable in all cases, we have done a good fitting, but the boundary is too nonlinear for logistic/LDA/QDA
+
+```{r}
+logisitic.plt.df=tibble(x=test.df$x, y=test.df$y, 
+                        predicted=as.factor(logistic.test.pred),
+                        truth=test.df$class, 
+                        correct =(logistic.test.pred==test.df$class))
+
+logistic.plt=ggplot(logisitic.plt.df, 
+                    aes(color=predicted, shape=correct,size=correct)) +
+  geom_point(aes(x=x,y=y)) +
+  scale_shape_manual(values = c(4,20)) +
+  scale_size_manual(values=c(4,1)) +
+  ggtitle("Logistic Model")
+
+print(logistic.plt)
+
+```
+
+```{r}
+lda.plt.df=tibble(x=test.df$x, y=test.df$y, 
+                  predicted=lda.test.pred$class,
+                  truth=test.df$class, 
+                  correct =(lda.test.pred$class==test.df$class) )
+
+lda.plt=ggplot(lda.plt.df, 
+               aes(color=predicted, shape=correct,size=correct)) +
+  geom_point(aes(x=x,y=y)) +
+  scale_shape_manual(values = c(4,20)) +
+  scale_size_manual(values=c(4,1)) +
+  ggtitle("LDA Model")
+
+print(lda.plt)
+
+```
+
+```{r}
+qda.plt.df=tibble(x=test.df$x, y=test.df$y, 
+                  predicted=qda.test.pred$class,
+                  truth=test.df$class, 
+                  correct =(qda.test.pred$class==test.df$class) )
+
+qda.plt=ggplot(qda.plt.df, 
+               aes(color=predicted, shape=correct,size=correct)) +
+  geom_point(aes(x=x,y=y)) +
+  scale_shape_manual(values = c(4,20)) +
+  scale_size_manual(values=c(4,1)) +
+  ggtitle("QDA Model")
+
+print(qda.plt)
+```
+
+```{r}
+knn.plt.df=tibble(x=test.df$x, y=test.df$y, 
+                  predicted=knn.test.pred,
+                  truth=test.df$class, 
+                  correct =(knn.test.pred==test.df$class) )
+
+knn.plt=ggplot(knn.plt.df, 
+               aes(color=predicted, shape=correct,size=correct)) +
+  geom_point(aes(x=x,y=y)) +
+  scale_shape_manual(values = c(4,20)) +
+  scale_size_manual(values=c(4,1)) +
+  ggtitle("kNN Model")
+
+print(knn.plt)
+
+```
+
+# ROC and AUC
+
+## Impact of Threshold on Accuracy - Manual Computation
+
+LDA model, for simplicity, from above example
+
+```{r}
+lda.train.pred$posterior
+```
+
+```{r}
+pt_vals = seq(0.0, 1.0, length.out= 51) # threshold values we test at
+
+# for each pt, compute false/true negative rate, false/true positive rate
+false_pos = numeric(length(pt_vals))
+false_neg = numeric(length(pt_vals))
+
+true_pos = numeric(length(pt_vals))
+true_neg = numeric(length(pt_vals))
+
+# identify true positives, true negatives
+idx_true_pos = (train.df$class==1)
+n_true_pos = sum(idx_true_pos)
+idx_true_neg = (train.df$class==0)
+n_true_neg = sum(idx_true_neg)
+
+
+# loop through each case
+for (j in 1:length(pt_vals)){
+  pt = pt_vals[j]
+  false_pos[j] = sum(lda.train.pred$posterior[idx_true_neg,2]>=pt)/n_true_neg
+  
+  true_pos[j] = sum(lda.train.pred$posterior[idx_true_pos,2]>=pt)/n_true_pos
+  
+  false_neg[j] = sum(lda.train.pred$posterior[idx_true_pos,2]<pt)/n_true_pos
+  
+  true_neg[j] = sum(lda.train.pred$posterior[idx_true_neg,2]<pt)/n_true_neg
+}
+```
+
+```{r}
+error.df = tibble("Threshold"=pt_vals, "False Positive"=false_pos, "False Negative"=false_neg, "True Positive" = true_pos, "True Negative" = true_neg)
+error.long.df = error.df %>% gather(key="Type", value = "Rate", -Threshold)
+error.long.df$`Type`= as.factor(error.long.df$`Type`)
+```
+
+Compare the rates as a function of threshold
+
+```{r}
+rate.plt = ggplot(error.long.df) + 
+  geom_point(mapping =  aes(x  = Threshold, y=`Rate`, color=`Type`))
+print(rate.plt)
+```
+
+Plot the ROC with `ggplot2`
+
+```{r}
+roc.plt = ggplot(error.df) + 
+  geom_point(mapping =  aes(x = `False Positive`, y=`True Positive`))
+print(roc.plt)
+```
+
+The closer the curve hugs the corner, the higher the performance
+
+## pROC Package
+
+`pROC` automates this for us
+
+```{r}
+library(pROC)
+```
+
+Get the vector of predicted class 1 probabilities for LDA model:
+
+```{r}
+ lda.predictions = predict(lda.fit, data =train.df, type="response")$posterior[,2]
+```
+
+```{r}
+lda.predictions
+```
+
+```{r}
+# arguments are true class, and predicted classs probabilities
+roc.result = roc(train.df$class,lda.predictions)
+```
+
+```{r}
+roc.result
+```
+
+The AUC is .9778
+
+```{r}
+roc.plt = ggroc(roc.result)
+print(roc.plt)
+```
+
+```{r}
+roc.plt = ggroc(roc.result) + ggtitle("Example ROC Plot")
+print(roc.plt)
+```
+
+# Model Error
+
+## Testing Variability
+
+After fitting a model with a training set for
+
+$$
+Y = \beta_0 + \beta_1 X + \epsilon
+$$
+
+Generate many testing sets and look at the variability of the testing mean squared error:
+
+```{r}
+# reset seed
+set.seed(100)
+
+# number of samples
+n = 100
+# create x values in training set
+x = runif(n, 0,15)
+# set true coefficients
+beta0_true = 2.
+beta1_true = -1.5
+# set noise parameters
+eps = 1.
+# create y values in training set
+y = beta0_true + beta1_true*x + eps * rnorm(length(x))
+train.df= tibble("x"=x, "y"=y)
+
+# train the linear model on the fixed training set, this is the \hat{f}
+lm.fit=lm(y~x, train.df)
+
+# testing error
+n_tests = 10^4 # number of independent testing sets to generate
+MSE = numeric(n_tests) # preallocate storage for the errros
+for(j in 1:n_tests){
+  # each of these data sets is of size n, and we generate n_tests of them
+  x = runif(n,0,15)
+  y = beta0_true + beta1_true*x + eps * rnorm(length(x))
+  test.df <- tibble("x"=x, "y"=y)
+  # MSE from the j-th testing set trial
+  MSE[j]=mean((predict(lm.fit,test.df) -test.df$y)^2)
+}
+
+# histogram the errors
+MSE.df=tibble("MSE"=MSE)
+
+MSE.plt=ggplot(MSE.df) + geom_histogram(aes(x=MSE),bins = 15) +
+  ggtitle("Mean Squared Error of a Linear Model",
+          subtitle = sprintf("%d Independent Test Sets of Size %d", n_tests, n)) +
+  theme_classic()
+print(MSE.plt)
+
+```
+
+There is real variability in MSE
