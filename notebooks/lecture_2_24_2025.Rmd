@@ -1,0 +1,358 @@
+---
+title: "Lecture 2/24/2025"
+output: html_document
+date: "2025-02-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+```
+
+# Variability due to training set size
+
+Try training with training data sets of different sizes, but fixed testing. This is for the linear problem:
+
+$$
+Y = \beta_0 + \beta_1 X + \epsilon
+$$
+
+```{r}
+
+# reset seed
+set.seed(100)
+
+# training set size values
+n_train <- c(5, 10,20, 40, 80)
+
+# validation (testing) set is fixed
+n_test = 10^4
+
+# set true coefficients
+beta0_true = 2.
+beta1_true = -1.5
+# set noise parameters
+eps = 1.
+
+# construct validation set, fixed over the entire computation
+x_test =  runif(n_test,0,15)
+y_test =  beta0_true + beta1_true*x_test + eps * rnorm(length(x_test))
+test.df = data.frame("x"= x_test, "y"=y_test)
+
+```
+
+Run each training data set experiment some number of times (`n_samples`):
+
+```{r}
+
+# number of samples per training set size
+n_samples = 100
+
+# these arrays begin as null but will be populated
+MSE_vals <- NULL
+n_vals <- NULL
+
+# loop over each training set size n_samples times construct training
+# data, train, compute the MSE, and record
+for(j in 1:length(n_train)){
+  for(i in 1:n_samples){
+    n = n_train[j]
+    x = runif(n,0,15)
+    y =  beta0_true + beta1_true*x + eps * rnorm(length(x))
+    train.df = data.frame("x"=x, "y"=y)
+    lm.fit = lm(y~x, data=train.df)
+
+    # record the n and the MSE value at which this was computed
+    n_vals = append(n_vals,n)
+    MSE_vals = append(MSE_vals,mean((predict(lm.fit,test.df) -test.df$y)^2))
+  }
+}
+# record as a data frame and post process
+MSE.df = data.frame("n"=n_vals, "MSE"=MSE_vals)
+MSE.df$n = as.factor(MSE.df$n)
+```
+
+Visualize
+
+```{r}
+MSE.plt=ggplot(MSE.df, aes(x=n, y=MSE_vals)) +geom_boxplot() +
+  ggtitle("Mean Squared Error of a Linear Model",
+          subtitle = sprintf("%d Test Sets of Size %d", n_samples, n_test)) +
+  scale_y_log10()+
+  labs(x="Training Set Size", y = "MSE") + theme_classic()
+print(MSE.plt)
+
+```
+
+**Note** the lower bound on the MSE is exactly $\mathrm{Var}(\epsilon)=1$ here; we cannot get lower than this.
+
+# Variability over different testing sets
+
+This is for the nonlinear problem
+
+$$
+Y = \exp(X) + \epsilon 
+$$
+
+```{r}
+set.seed(100)
+
+# test/train sample size
+n =200
+# number of splits
+m = 5
+
+maxp = 25
+
+# preallocate an array with zeros
+test.MSE.vals <- NULL
+trial.vals <- NULL
+p.vals <- NULL
+
+# generate the entire data set
+x <- runif(n,0,5)
+y <- exp(x) +2 * rnorm(n)
+data.df <- tibble("x"=x, "y"=y)
+
+# loop over data sets and polynomial fits
+for (j in seq(m)){
+  idx.train <- sample(seq(n), size = n/2)
+  train.df <- data.df[idx.train,]
+  test.df <- data.df[-idx.train,]
+  # try all the polynomial fits on the testing data
+  MSE =0
+  for(p in seq(maxp)){
+    lm.fit <- lm(y~poly(x,p), data=train.df)
+    test.MSE.vals <- append(test.MSE.vals,mean((test.df$y - predict(lm.fit,test.df))^2))
+    p.vals <- append(p.vals, p)
+    trial.vals <- append(trial.vals, j)
+  }
+}
+
+mse.df <- tibble(p=p.vals, MSE=test.MSE.vals, Trial=trial.vals)
+mse.df$p <- as.integer(mse.df$p)
+mse.df$Trial <- as.factor(mse.df$Trial)
+
+val.plt <- ggplot(mse.df,mapping = aes(x=p, y=MSE, color=Trial)) +
+  geom_line(lwd=2) +
+  labs(x ="Degree of Polynomial", y = "MSE", title="50% Train-Test Data Split") +
+  theme_classic()+scale_y_log10()
+print(val.plt)
+
+```
+
+There is inherent variability from our training/testing data.
+
+# Cross Validation
+
+## LOOCV
+
+`cv.glm` is part of part of `boot`, and it does the cross validation
+
+```{r}
+library(boot)
+```
+
+After setting up `glm.fit`, run `cv.err = cv.glm(train.df,glm.fit)` to do cross validation.
+
+### Create Data
+
+```{r}
+set.seed(100)
+
+# test/train sample size
+n = 10^2
+# generate the training set
+x = runif(n,0,5)
+y = exp(x)*(1 + .5 * rnorm(n))
+train.df = tibble("x"=x, "y"=y)
+
+```
+
+### Loop over Models
+
+Try different polynomial fits
+
+```{r}
+
+maxp = 10
+
+# preallocate an array with zeros
+loocv.MSE.vals = rep(0,maxp)
+
+
+# loop over data sets and polynomial fits
+for(p in seq(maxp)){
+    glm.fit = glm(y~poly(x,p), data=train.df)
+    # run LOOCV cross validation
+    cv.err = cv.glm(train.df,glm.fit)
+    # actual errors are stored in $delta[1]
+    loocv.MSE.vals[p] =cv.err$delta[1]
+}
+
+loocv.MSE.df = tibble(p = seq(maxp), MSE=loocv.MSE.vals)
+
+```
+
+Visualize:
+
+```{r}
+
+loocv.plt = ggplot(loocv.MSE.df,mapping = aes(x=p, y=MSE)) +
+  geom_line(lwd=2) +
+  labs(x ="Degree Polynomial", y = "MSE", title="LOOCV MSE as a Function of Fit") 
+print(loocv.plt)
+```
+
+Simplest model within this family of polynomials is degree 3; this is a better choice than degree 12, even though that is slightly lower.
+
+## k-Fold Cross Validation (CV)
+
+Typically do k-Fold instead, with $k=5, 10$. $k$-Fold is done with `cv.glm` with a `K=` argument for the number of folds. If no argument is given, defaults to LOOCV.
+
+This script compares the error across LOOCV, 5-fold and 10-fold.
+
+```{r}
+# create arrays
+MSE.vals = NULL
+Method.vals = NULL
+p.vals = NULL
+
+# loop over data sets and polynomial fits
+for(p in seq(maxp)){
+  glm.fit = glm(y~poly(x,p), data=train.df)
+  
+  # defaults to LOOCV 
+  cv.err = cv.glm(train.df,glm.fit)
+  p.vals = append(p.vals,p)
+  MSE.vals = append(MSE.vals,cv.err$delta[1])
+  Method.vals = append(Method.vals,"LOOCV")
+
+  # 5-fold CV
+  cv.err = cv.glm(train.df,glm.fit, K=5)
+  p.vals = append(p.vals,p)
+  MSE.vals = append(MSE.vals,cv.err$delta[1])
+  Method.vals = append(Method.vals, "5-Fold CV")
+
+  # 10-fold CV
+  cv.err = cv.glm(train.df,glm.fit, K=10)
+  p.vals = append(p.vals,p)
+  MSE.vals = append(MSE.vals,cv.err$delta[1])
+  Method.vals = append(Method.vals, "10-Fold CV")
+  
+}
+# store results of experiment in a data frame
+MSE.df = tibble(p=p.vals, MSE=MSE.vals, Method=Method.vals)
+MSE.df$Method = as.factor(MSE.df$Method)
+#plot
+cv.plt = ggplot(MSE.df,mapping = aes(x=p, y=MSE, color=Method)) +
+  geom_line(lwd=2) + 
+  labs(x ="Degree Polynomial", y = "MSE", title="MSE as a Function of Fit and CV Method")
+
+print(cv.plt)
+```
+
+$k$-fold CV splits the data sets randomly. 10-fold is a good estimate here; we would predict to use the degree 4 polynomial, which is not too much worse than the degree 3 polynomial we would use based on LOOCV.
+
+If you can afford, computationally, to use LOOCV, use it; most of the time it's too expensive.
+
+## Classifiers
+
+Here, we consider, in place of the MSE, the misclassification error rate. But the same techniques apply. This compares, LDA, QDA, logistic, and KNN, directly
+
+### Create Data
+
+```{r}
+set.seed(100)
+
+n = 10^3
+#generate data
+y1 <- runif(n,-3,3)
+y2 <- runif(n,-3,3)
+# jitter the positions
+x1 <- y1+.1*rnorm(n)
+x2 <- y2+.1*rnorm(n)
+class <- factor(1-as.integer(0< y2-y2^3-y1))
+function.df <- tibble("x1"=x1, "x2"=x2, "class"=class)
+scatter.plt <- ggplot(function.df, aes(x=x1, y=x2, color=class)) +
+  geom_point() 
+print(scatter.plt)
+```
+
+### Create Folds
+
+We need to manually create the folds to work with these fits. This is because we do not necessarily directly use `glm.fit` for some of these classifier methods. This requires `caret` :
+
+```{r}
+library(caret)
+```
+
+```{r}
+# set folds for Cross Validation
+K = 10
+folds = createFolds(seq(nrow(function.df)),k=K)
+folds
+```
+
+`folds$Foldk` are indices in the fold `k`; we have not actually partitioned `function.df` the data set we were given.
+
+### Compute CV Error
+
+We now manually loop through each of the folds, training and then testing, on all of the methods:
+
+```{r}
+library(MASS)
+library(FNN)
+```
+
+```{r}
+logistic_err = 0
+LDA_err = 0
+QDA_err= 0
+knn_err = 0
+
+# loop through the folds and compute the k fold error estimates
+for(j in seq(K)){
+  # extracts training and testing sets
+  train.df = function.df[-folds[[j]],]
+  test.df = function.df[folds[[j]],]
+
+  # train, predict, compute testing error in each case
+  logistic.train = glm(class~x1+x2 , train.df, family = binomial)
+  logistic.prob = predict(logistic.train,newdata = test.df, type = "response")
+  logistic.pred = rep(0, nrow(test.df))
+  logistic.pred[logistic.prob>0.5] = 1
+  # logistic error 
+  logistic_err =  logistic_err + mean(logistic.pred!= test.df$class)/K
+
+  lda.train = lda(class~x1+x2, data = train.df)
+  lda.pred = predict(lda.train, test.df)
+  # LDA error
+  LDA_err = LDA_err + mean(lda.pred$class !=test.df$class)/K
+
+  qda.train = qda(class~x1+x2, data = train.df)
+  qda.pred = predict(qda.train, test.df)
+  # QDA error
+  QDA_err = QDA_err + mean(qda.pred$class !=test.df$class)/K
+
+  knn.pred = knn(as.matrix(train.df[1:2]), as.matrix(test.df[1:2]),
+                    as.matrix(train.df[3]), k=3)
+  # kNN error
+  knn_err = knn_err + mean(knn.pred!= test.df$class)/K
+
+}
+
+```
+
+Compare the results:
+
+```{r}
+sprintf("Logistic %d-fold Error = %g", K, logistic_err)
+sprintf("LDA %d-fold Error = %g", K, LDA_err)
+sprintf("QDA %d-fold Error = %g", K, QDA_err)
+sprintf("KNN with k=3 %d-fold Error = %g", K, knn_err)
+
+```
+
+Gives us a good justification for using kNN.
