@@ -1,0 +1,76 @@
+---
+title: "Lecture 2/26/2025"
+output: html_document
+date: "2025-02-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(boot)
+```
+
+# Bootstrap
+
+Application to estimating the kurtosis of a random variable:
+
+$$
+\text{Kurtosis} = \frac{\mathbb{E}[(X-\mu)^4]}{\mathbb{E}[(X-\mu)^2]^2}
+$$
+
+This measures how far from normal a distribution is. A naive estimate is:
+
+$$
+\frac{\frac{1}{n}\sum_{i=1}^n (x_i-\hat\mu)^4}{(\frac{1}{n}\sum_{i=1}^n (x_i-\hat\mu)^2)^2}
+$$
+
+An error bound on our estimate of this can be formed by bootstrap methods.
+
+## Generate data
+
+We will estimate the kurtosis of the $\mathrm{Exp}(1)$, the exponential distribution with parameter $\lambda = 1$
+
+First, we generate data for this experiment
+
+```{r}
+set.seed(100)
+
+# number of samples in the data set
+n <- 10^3
+x <- rexp(n) # these are exponential random variables (non-Gaussians)
+
+x.df <- tibble(x=x)
+```
+
+True kurtosis of this problem is 9
+
+## Define Function for Bootstrapping
+
+```{r}
+kurtosis.fn = function(data,index){
+  # extract values of interest in the current bootstrap sample determined by index
+  x = data$x[index]
+  # estimate the mean
+  mu = mean(x)
+  # compute the estiamted kurtosis
+  k = mean((x-mu)^4)/(mean((x-mu)^2)^2)
+  return (k)
+}
+```
+
+## Compute Bootstrap
+
+```{r}
+bt = boot(x.df,kurtosis.fn,R=10^3) # R is the number of Bootstrap samples
+
+```
+
+```{r}
+bt
+```
+
+```{r}
+boot.ci(bt)
+```
+
+4 different types of CIs for the estimated value. True answer, 9, is in all of them.
