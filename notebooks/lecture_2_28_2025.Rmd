@@ -1,0 +1,198 @@
+---
+title: "Lecture 2/28/2025"
+output: html_document
+date: "2025-02-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Linear Algebra Problems
+
+What happens when we only have $n=1$, but $p=1$ (and there are two unknowns):
+
+```{r}
+xy.df = tibble(x=c(1), y = c(2)) # create a data frame with one point, (1,2)
+lm.fit = lm(y~x, data = xy.df)
+lm.fit
+```
+
+$\beta_0=2$ and $\beta_1$ is `NA` because the matrix is singular.
+
+By default in R, it is *ok* to have a singular matrix.
+
+Force it to not want to work with a singular matrix (set `singular.ok=FALSE`):
+
+```{r}
+lm.fit = lm(y~x, data = xy.df,singular.ok = FALSE)
+```
+
+# Problems with Many Features
+
+Consider data
+
+$$
+Y = \beta_0 + \beta_1 X_1 + \sum_{j=2}^p \beta_j X_j + \epsilon,
+$$
+
+in the case that $\beta_2=\beta_3=\ldots \beta_p=0$. This makes features $X_2, \ldots X_p$ nuisance features; they are not relevant to the task of predicting $Y$.
+
+## Create Data
+
+```{r}
+set.seed(300)
+
+# number of observations
+n = 50
+# total number of predictors
+p = 100
+# the x1 predictor and y
+x1 = runif(0,1,n=n)
+y = 1 + 2 * x1 + 0.1 * rnorm(n) #true model, \beta_0 = 1, \beta_1 = 2
+
+# fill the other p-1 variables with Gaussian noise by
+# first populating a matrix
+x_rest <- matrix(0.01 * rnorm(n *(p-1)), n, p-1)
+# then we name the columns using colnames and paste
+colnames(x_rest) <- paste("x",2:p, sep="")
+# now we glue the columns together into a single matrix
+data.matrix <- cbind(x1, x_rest, y)
+
+# this reinterprets the matrix as a data frame
+data.df=as_tibble(data.matrix)
+```
+
+Check the data frame
+
+```{r}
+data.df
+```
+
+## Train
+
+```{r}
+# regress on all variables, without naming them
+lm.fit.all = lm(y~., data = data.df, singular.ok=TRUE)
+```
+
+Check what we have found:
+
+```{r}
+lm.fit.all
+```
+
+There are many `NA` values because $p+1> n$, making the matrix singular.
+
+```{r}
+lm.fit.all$coefficients[1:5]
+```
+
+The coefficients for features $2-p$ should be zero.
+
+```{r}
+lm.fit.all$coefficients[1:5]
+```
+
+Check CIs:
+
+```{r}
+confint(lm.fit.all)
+```
+
+This is deeply sensitive to noise, try changing the `seed` . This all comes back to the feature matrix $X$ being singular.
+
+## Training with Prior Knowledge
+
+Suppose we knew all those other features were irrelevant; only train against $X_1$:
+
+```{r}
+lm.fit.one = lm(y~x1, data = data.df, singular.ok=TRUE)
+lm.fit.one
+```
+
+```{r}
+confint(lm.fit.one)
+```
+
+Prior knowledge - know something qualitative about the data.
+
+# Correlated Featuress
+
+Consider the case that
+
+$$
+X_2 = \alpha_0  + \alpha_1 X_1 + \eta
+$$
+
+where $\eta$ is some other mean zero noise.
+
+## Noise Free Case
+
+### Create data
+
+```{r}
+set.seed(100)
+
+n = 100
+x1 = runif(0,1,n = n)
+x2 = 2 - x1 # no noise between x1 and x2
+y = 1 + 2 * x1 + 3 * x2 + 0.1 * rnorm(n)
+data.df=data.frame(x1=x1, x2=x2, y=y)
+```
+
+### Fit
+
+```{r}
+lm.fit.all = lm(y~., data = data.df, singular.ok=TRUE)
+coef(lm.fit.all)
+```
+
+Correlations gave us an `NA` for $\beta_2$.
+
+## Noisy Case
+
+$\eta\neq 0$ now
+
+### Create Data
+
+```{r}
+set.seed(100)
+
+n = 100
+x1 <- runif(0,1,n = n)
+x2 <- 2 - x1 + 0.01 * rnorm(n) # added a tiny bit of noise
+y <- 1 + 2 * x1 + 3 * x2 + 0.1 * rnorm(n)
+data.df <- data.frame(x1=x1, x2=x2, y=y)
+
+
+```
+
+### Fit
+
+```{r}
+lm.fit.all= lm(y~., data = data.df, singular.ok=FALSE)
+coef(lm.fit.all)
+```
+
+```{r}
+confint(lm.fit.all)
+```
+
+These CIs do not include the truth.
+
+## Smart Choice
+
+Only regress against $X_1$
+
+```{r}
+lm.fit.x1= lm(y~x1, data = data.df, singular.ok=TRUE)
+
+```
+
+```{r}
+coef(lm.fit.x1)
+confint(lm.fit.x1)
+
+```
