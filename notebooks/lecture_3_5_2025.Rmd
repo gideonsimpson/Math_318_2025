@@ -1,0 +1,259 @@
+---
+title: "Lecture 3/5/2025"
+output: html_document
+date: "2025-03-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(glmnet) # this provides ridge regression
+```
+
+# Ridge Regression in R
+
+## Generate Data
+
+Revisit the problem with more predictors than observations AND $y$ only really depends on $x_1$. We have way more features than data.
+
+```{r}
+set.seed(100)
+
+# number of observations
+n = 500
+# total number of features
+p = 600
+# the x1 predictor and y
+x1 <- runif(0,1,n=n)
+y <- 1 + 2 * x1 + 0.1 * rnorm(n) #true model, \beta_0 = 1, \beta_1 = 2
+
+# fill the other p-1 variables with Gaussian noise by
+# first populating a matrix
+x_rest <- matrix(0.01 * rnorm(n *(p-1)), n, p-1)
+# then we name the columns using colnames and paste
+colnames(x_rest) <- paste("x",2:p, sep="")
+# now we glue the columns together into a single matrix
+data.matrix <- cbind(x1, x_rest, y)
+
+# this reinterprets the matrix as a data frame
+data.df <- as_tibble(data.matrix)
+```
+
+## Apply Ridge Regression
+
+To use `glmnet` for Ridge Regression, we need to extract the design matrix (without the intercept column), and store it as a matrix:
+
+```{r}
+X = model.matrix(y~., data.df)[,-1] # -1 omits the first column, corresponding to the intercept
+```
+
+```{r}
+X
+```
+
+Fitting is then very similar to `glm`; however, we need to specify the $\lambda>0$ . The standard approach is not to do this for a single $\lambda$, but instead, an array of them:
+
+$$
+\lambda = 10^{q}
+$$
+
+over a range of $q$
+
+```{r}
+low = -4
+high = 4
+lambda.grid = 10^seq(high, low,length = 51)
+lambda.grid
+```
+
+The choice of `51` is arbitrary.
+
+Perform ridge regression (`alpha=0` to get ridge)
+
+```{r}
+ridge.fit = glmnet(X,y, alpha = 0, lambda = lambda.grid)
+ridge.fit
+```
+
+At this point, it is not particularly informative.
+
+## Evaluating Results
+
+Get the coefficients and store in a data frame:
+
+```{r}
+beta = as.matrix(coef(ridge.fit))
+beta.df = as_tibble(beta)
+beta.df$coef = row.names(beta)
+beta.df
+```
+
+Each column is the collection of all $\beta_{j,\lambda}$, including $\beta_{0,\lambda}$, for a given $\lambda$ (which is `s` in R).
+
+Reformat the data
+
+```{r}
+# spread out
+beta.df.long = gather(beta.df,key=case,value,-coef)
+# relabel columns
+beta.df.long$case = as.integer(gsub("s", "", beta.df.long$case))
+beta.df.long$lambda =ridge.fit$lambda[beta.df.long$case+1]
+beta.df.long
+```
+
+Visualize the coefficients as a function of $\lambda$:
+
+```{r}
+# plot all coefficients
+beta.plt = ggplot(beta.df.long[beta.df.long$coef!="(Intercept)",], 
+                   aes(x=lambda, y=value,color = coef,linetype = coef)) + 
+  geom_line() + theme(legend.position="none") +
+  scale_x_log10()  + ggtitle("Ridge Regression Coefficients") + ylab("Coefficients")
+print(beta.plt)
+```
+
+As $\lambda\nearrow$, the $\beta_{j,\lambda}\to 0$, except $\beta_{0,\lambda}$. As $\lambda\to\infty$ , our prediction will be $\hat{y} = \bar{y}$, the sample response mean.
+
+Study a single coefficient:
+
+```{r}
+beta0.plt= ggplot(beta.df.long[beta.df.long$coef=="(Intercept)",], aes(x=lambda, y=value,
+color = coef, linetype = coef)) +
+geom_line() + theme(legend.position="none") +
+ggtitle("beta 0 Ridge Regression Coefficient") +
+scale_x_log10()
+print(beta0.plt)
+```
+
+```{r}
+beta1.plt= ggplot(beta.df.long[beta.df.long$coef=="x1",], aes(x=lambda, y=value,
+color = coef, linetype = coef)) +
+geom_line() + theme(legend.position="none") +
+ggtitle("beta 1 Ridge Regression Coefficient") +
+scale_x_log10()
+print(beta1.plt)
+```
+
+Make new predictions with our model. `s` corresponds to $\lambda$. The `t` is for transpose
+
+```{r}
+predict(ridge.fit, s=0.1, newx=t(runif(p)))
+```
+
+```{r}
+mean(y)
+```
+
+This shows that when $\lambda$ is large, we have zeroed out all the coefficients, and our prediction is $\hat{\beta}_0$, which is just `mean(y)`
+
+Try predicting at a new random value of `x` and a particular value of $\lambda$, set with the `s` argument
+
+```{r}
+predict(ridge.fit, s=.1, newx=t(runif(p)))
+```
+
+## Cross Validate
+
+Call `cv.glmnet`, instead of just `glmnet`:
+
+```{r}
+cv.ridge = cv.glmnet(X, y, alpha = 0, lambda = lambda.grid)
+```
+
+`alpha=0` - this corresponds to ridge regression
+
+```{r}
+cv.ridge
+```
+
+`s=cv.ridge$lambda.min` gets the coefficients with the MSE minimizing $\lambda$. We can visualize this as:
+
+```{r}
+# visualize using ggplot2
+cv.df=tibble(lambda=cv.ridge$lambda,# lambdas we compute on
+            cvm=cv.ridge$cvm,       # estimated MSE
+            cvlo=cv.ridge$cvlo,     # lower error bar on MSE
+            cvup=cv.ridge$cvup)     # upper error bar on MSE
+
+cv.plt = ggplot(cv.df) + geom_point(aes(x=lambda,y=cvm),color="red") +
+geom_errorbar(aes(x=lambda, ymin=cvlo, ymax=cvup),alpha = .25) +
+geom_vline(xintercept = cv.ridge$lambda.min,linetype = "dashed")+
+geom_vline(xintercept = cv.ridge$lambda.1se,linetype = "dashed")+
+ggtitle("Ridge Regression Error") +
+ylab("Cross Validated MSE") +
+scale_x_log10()
+print(cv.plt)
+```
+
+```{r}
+cv.ridge$lambda.min
+```
+
+Extract the coefficients at the estimated optimal choice of $\lambda$:
+
+```{r}
+beta.minimal = predict(ridge.fit, type = "coefficients", s = cv.ridge$lambda.min)
+beta.minimal[1:10]
+```
+
+# LASSO
+
+## Apply LASSO
+
+Set `alpha=1` for LASSO
+
+```{r}
+lasso.fit = glmnet(X,y, alpha = 1, lambda = lambda.grid)
+lasso.fit
+```
+
+## Evaluate Results
+
+```{r}
+beta.lasso = as.matrix(coef(lasso.fit))
+beta.lasso.df = as_tibble(beta.lasso)
+beta.lasso.df$coef = row.names(beta.lasso)
+beta.lasso.df
+```
+
+```{r}
+# spread out
+beta.lasso.df.long = gather(beta.lasso.df,key=case,value,-coef)
+# relabel columns
+beta.lasso.df.long$case = as.integer(gsub("s", "", beta.lasso.df.long$case))
+beta.lasso.df.long$lambda =lasso.fit$lambda[beta.lasso.df.long$case+1]
+beta.lasso.df.long
+```
+
+```{r}
+# plot all coefficients
+beta.lasso.plt = ggplot(beta.lasso.df.long[beta.lasso.df.long$coef!="(Intercept)",], 
+                   aes(x=lambda, y=value,color = coef,linetype = coef)) + 
+  geom_line() + theme(legend.position="none") +
+  scale_x_log10()  + 
+  ggtitle("LASSO Coefficients") + 
+  ylab("Coefficients")
+print(beta.lasso.plt)
+```
+
+## Cross Validate
+
+```{r}
+cv.lasso = cv.glmnet(X, y, alpha = 1, lambda = lambda.grid)
+```
+
+```{r}
+cv.lasso.df=tibble(lambda=cv.lasso$lambda, 
+            cvm=cv.lasso$cvm, 
+            cvlo=cv.lasso$cvlo,
+            cvup=cv.lasso$cvup)
+
+cv.plt = ggplot(cv.lasso.df) + geom_point(aes(x=lambda,y=cvm),color="red") +
+geom_errorbar(aes(x=lambda, ymin=cvlo, ymax=cvup),alpha = .25) +
+geom_vline(xintercept = cv.lasso$lambda.min,linetype = "dashed")+
+geom_vline(xintercept = cv.lasso$lambda.1se,linetype = "dashed")+
+ggtitle("LASSO Error") +
+ylab("Cross Validated MSE") +
+scale_x_log10()
+print(cv.plt)
+```
