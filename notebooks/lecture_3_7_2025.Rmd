@@ -1,0 +1,123 @@
+---
+title: "Lecture 3/7/2025"
+output: html_document
+date: "2025-03-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(glmnet) # this provides ridge regression and LASSO
+```
+
+# Generate Data
+
+Revisit the problem with more predictors than observations AND $y$ only really depends on $x_1$. We have way more features than data.
+
+```{r}
+set.seed(100)
+
+# number of observations
+n = 500
+# total number of features
+p = 600
+# the x1 predictor and y
+x1 <- runif(0,1,n=n)
+y <- 1 + 2 * x1 + 0.1 * rnorm(n) #true model, \beta_0 = 1, \beta_1 = 2
+
+# fill the other p-1 variables with Gaussian noise by
+# first populating a matrix
+x_rest <- matrix(0.01 * rnorm(n *(p-1)), n, p-1)
+# then we name the columns using colnames and paste
+colnames(x_rest) <- paste("x",2:p, sep="")
+# now we glue the columns together into a single matrix
+data.matrix <- cbind(x1, x_rest, y)
+
+# this reinterprets the matrix as a data frame
+data.df <- as_tibble(data.matrix)
+X = model.matrix(y~., data.df)[,-1] # -1 omits the first column, corresponding to the intercept
+```
+
+## 
+
+# LASSO
+
+## Apply LASSO
+
+```{r}
+low = -4
+high = 4
+lambda.grid = 10^seq(high, low,length = 51)
+lambda.grid
+```
+
+Set `alpha=1` for LASSO
+
+```{r}
+lasso.fit = glmnet(X,y, alpha = 1, lambda = lambda.grid)
+lasso.fit
+```
+
+## Evaluate Results
+
+```{r}
+beta.lasso = as.matrix(coef(lasso.fit))
+beta.lasso.df = as_tibble(beta.lasso)
+beta.lasso.df$coef = row.names(beta.lasso)
+beta.lasso.df
+```
+
+```{r}
+# spread out
+beta.lasso.df.long = gather(beta.lasso.df,key=case,value,-coef)
+# relabel columns
+beta.lasso.df.long$case = as.integer(gsub("s", "", beta.lasso.df.long$case))
+beta.lasso.df.long$lambda =lasso.fit$lambda[beta.lasso.df.long$case+1]
+beta.lasso.df.long
+```
+
+```{r}
+# plot all coefficients
+beta.lasso.plt = ggplot(beta.lasso.df.long[beta.lasso.df.long$coef!="(Intercept)",], 
+                   aes(x=lambda, y=value,color = coef,linetype = coef)) + 
+  geom_line() + theme(legend.position="none") +
+  scale_x_log10()  + 
+  ggtitle("LASSO Coefficients") + 
+  ylab("Coefficients")
+print(beta.lasso.plt)
+```
+
+## Cross Validate
+
+```{r}
+cv.lasso = cv.glmnet(X, y, alpha = 1, lambda = lambda.grid)
+```
+
+```{r}
+cv.lasso.df=tibble(lambda=cv.lasso$lambda, 
+            cvm=cv.lasso$cvm, 
+            cvlo=cv.lasso$cvlo,
+            cvup=cv.lasso$cvup)
+
+cv.plt = ggplot(cv.lasso.df) + geom_point(aes(x=lambda,y=cvm),color="red") +
+geom_errorbar(aes(x=lambda, ymin=cvlo, ymax=cvup),alpha = .25) +
+geom_vline(xintercept = cv.lasso$lambda.min,linetype = "dashed")+
+geom_vline(xintercept = cv.lasso$lambda.1se,linetype = "dashed")+
+ggtitle("LASSO Error") +
+ylab("Cross Validated MSE") +
+scale_x_log10()
+print(cv.plt)
+```
+
+```{r}
+beta.minimal = predict(lasso.fit, type = "coefficients", s = cv.lasso$lambda.min)
+beta.minimal
+```
+
+```{r}
+sum(abs(beta.minimal)>0)
+```
+
+A total of 6 nonzero $\beta_{j}$'s are found. This is a massive reduction in the number of relevant features (600).
+
+# 
